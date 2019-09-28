@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>DevBio Game</title>
+	<link rel="icon" href="data:;base64,iVBORw0KGgo=">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.2.1/css/bootstrap.min.css" integrity="sha384-GJzZqFGwb1QTTN6wy59ffF1BuGJpLSa9DkKMp0DgiMDm4iYMj70gZWKYbI706tWS" crossorigin="anonymous">
+	<link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/themes/smoothness/jquery-ui.css">
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+	<script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.3/js/bootstrap.min.js"></script>
+	<script src="./z.js"></script>
+	<style type="text/css">
+        #main-canvas {
+            width: 100%;
+            height: auto;
+        }
+	</style>
+	<script>
+        $(document).ready(function() {
+
+            // Each line has one operation
+            // Each operation has zero or more operands
+            // Each operand has a dropdown
+
+            let vars = [ "A", "B" ];
+
+            let lines = [ 1, 2, 3, 4 ];
+
+            let operations = {
+                "Set": [
+                    {
+                        operand: "Destination",
+                        options: vars,
+                    },
+                    {
+                        label: "From",
+                    },
+                    {
+                        operand: "Source",
+                        options: vars,
+                    },
+                ],
+                "Goto": [
+                    {
+                        operand: "Line",
+                        options: lines,
+                    },
+                ],
+                "If": [
+                    {
+                        operand: "Left",
+                        options: vars,
+                    },
+                    {
+                        operand: "Cmp",
+                        options: [ "<", "<=", "==", ">=", ">" ],
+                    },
+                    {
+                        operand: "Right",
+                        options: vars,
+                    },
+                    {
+                        label: "Goto",
+                    },
+                    {
+                        operand: "Goto",
+                        options: lines,
+                    },
+                ],
+            };
+
+            function zDropdownSelect(btnClass, title, options) {
+                return z("span.dropdown-select",
+                    z(`a.btn.btn-primary.dropdown-toggle${btnClass}`,
+                        {
+                            data: { toggle: "dropdown" },
+                            href: "#",
+                        },
+                        title
+                    ),
+                    z("ul.dropdown-menu",
+                        options.map( (option) => {
+                            return z("li.dropdown-item", z("a", { href: "#" }, `${option}`) );
+                        }),
+                    ),
+                );
+            }
+
+            function zOpLine(lineI) {
+                return z("li.list-group-item",
+                    z("span.badge.badge-primary.badge-pill", `${lineI + 1}`),
+                    z("div.btn-group.op-line",
+                        zDropdownSelect(".operation", "Operation", Object.keys(operations)),
+                        z("div.operands"),
+                    )
+                );
+            }
+
+            let zOpLines = z("ul.list-group",
+                Array(4).fill().map( (_, i) => {
+                    return zOpLine(i);
+                }),
+            );
+
+            let zCanvas = z("canvas#main-canvas", {width: 1000, height:1000});
+
+            let zMain = z("div.container-fluid.p-3",
+                z("div.row",
+                    z("div.col-5", zOpLines),
+                    z("div.col", zCanvas),
+                ),
+            );
+
+            $("#main").html(zMain);
+
+            $("#main").on("click", ".dropdown-menu li a", function() {
+                // Called when any dropdown is click; SET the text and trigger a change
+                let selText = $(this).text();
+                $(this).closest(".dropdown-select").find(".dropdown-toggle").text(selText).change();
+            });
+
+            $(".operation").change( function() {
+                // Called when any operation changes; REPLACE the operands
+                let operation = $(this).text();
+                let operandDicts = operations[operation];
+                $(this).closest(".op-line").find(".operands").html(
+                    operandDicts.map( (operandDict) => {
+                        if("label" in operandDict) {
+                            return z("span", `${operandDict.label}:`);
+                        }
+                        else {
+                            return zDropdownSelect(".operand", operandDict.operand, operandDict.options);
+                        }
+                    }),
+                );
+            });
+
+            // v is the number of variables per cell
+            // n is the number of cells on each axis
+            // d is the pixel dimension of each cell at 1:1 scaling
+
+            v = 4;
+            n = 10;
+            d = 40;
+
+            // TODO: general purpose mat allocator
+            let stateByYXV = [];
+            for (let y=0; y < n; y++) {
+                let xs = [];
+                for (let x=0; x < n; x++) {
+                    let state = [];
+                    for (let i=0; i < v; i++) {
+                        state.push(0);
+                    }
+                    xs.push(state);
+                }
+                stateByYXV.push(xs);
+            }
+
+            stateByYXV[3][5][1] = 1;
+            stateByYXV[3][5][0] = 2;
+
+            function createTris(nativeDim) {
+                let halfPi = Math.PI / 2;
+                let twoPi = Math.PI * 2;
+
+                function createTri(rot, hue) {
+                    let triCanvas = z("canvas", { width: nativeDim, height: nativeDim } );
+                    let c = triCanvas.getContext("2d");
+                    let d2 = nativeDim / 2;
+                    c.save();
+                        c.translate(d2, d2);
+                        c.rotate(rot);
+                        c.fillStyle = `hsl(${hue}, 100%, 50%)`;
+                        c.beginPath();
+                        c.moveTo(0, 0);
+                        c.lineTo(-d2, -d2);
+                        c.lineTo(-d2, +d2);
+                        c.fill();
+                        c.closePath();
+                    c.restore();
+                    return triCanvas;
+                }
+
+                let trisByRotAndState = [];
+                for (let rot=0; rot < 4; rot++) {
+                    let tris = [];
+                    for (let state=0; state < 4; state ++) {
+                        tri = createTri(rot * halfPi, 360 * state / 4 );
+                        tris.push(tri);
+                    }
+                    trisByRotAndState.push(tris);
+                }
+
+                return trisByRotAndState;
+            }
+
+            let mainCanvas = $("#main-canvas")[0];
+            c = mainCanvas.getContext("2d");
+
+            let trisByRotAndState = createTris(d);
+
+            function render() {
+                c.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
+                c.save();
+                    c.scale(1, 1);
+                    for (let y=0; y<n; y++) {
+                        for (let x=0; x<n; x++) {
+                            c.save();
+                                c.translate(x * d + 4*Math.random(), y * d + 4*Math.random());
+                                for (let i=0; i<v; i++) {
+                                    c.drawImage(trisByRotAndState[i][stateByYXV[y][x][i]], 0, 0);
+                                }
+                            c.restore();
+                        }
+                    }
+
+                    c.strokeStyle = "black";
+                    c.lineWidth = 1;
+                    for (let y=0; y<=n; y++) {
+                        c.moveTo(0, y*d+0.5);
+                        c.lineTo(n*d, y*d+0.5);
+                        c.stroke();
+                    }
+
+                    for (let x=0; x<=n; x++) {
+                        c.moveTo(x*d, 0);
+                        c.lineTo(x*d, n*d);
+                        c.stroke();
+                    }
+                c.restore();
+                window.requestAnimationFrame(render);
+            }
+
+            window.requestAnimationFrame(render);
+        });
+
+	</script>
+</head>
+<body id="main" class="container">
+</body>
+</html>
+
+
+<!--
+
+-->
