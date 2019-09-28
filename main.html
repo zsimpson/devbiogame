@@ -21,26 +21,38 @@
 	</style>
 	<script>
         $(document).ready(function() {
+            // v is the number of variables per cell
+            // s is the number of states per variable
+            // n is the number of cells on each axis
+            // d is the pixel dimension of each cell at 1:1 scaling
+            // l is the number of instruction lines
+            const v = 2;
+            const s = 8;
+            const n = 30;
+            const d = 20;
+            const l = 4;
 
             // Each line has one operation
             // Each operation has zero or more operands
             // Each operand has a dropdown
 
-            let vars = [ "A", "B" ];
+            let vars = new Array( v ).fill( 1 ).map( ( _, i ) => String.fromCharCode( 65 + i ) );
 
-            let lines = [ 1, 2, 3, 4 ];
+            let lines = new Array( l ).fill().map( ( _, i ) => i+1 );
 
             let operations = {
-                "Set": [
+                "Replicate": [
                     {
-                        operand: "Destination",
-                        options: vars,
+                        label: "Direction",
                     },
                     {
-                        label: "From",
+                        operand: "Direction",
+                        options: ["West", "North", "East", "South"],
                     },
+                ],
+                "Increment": [
                     {
-                        operand: "Source",
+                        operand: "Variable",
                         options: vars,
                     },
                 ],
@@ -71,6 +83,8 @@
                         options: lines,
                     },
                 ],
+                "Stop": [
+                ],
             };
 
             function zDropdownSelect(btnClass, title, options) {
@@ -100,26 +114,29 @@
                 );
             }
 
-            let zOpLines = z("ul.list-group",
+            let zOpLines = z("ul.list-group#op-lines",
                 Array(4).fill().map( (_, i) => {
                     return zOpLine(i);
                 }),
             );
 
-            let zCanvas = z("canvas#main-canvas", {width: 1000, height:1000});
+            let zCanvas = z("canvas#main-canvas", {width: n * d, height: n * d});
 
             let zMain = z("div.container-fluid.p-3",
                 z("div.row",
-                    z("div.col-5", zOpLines),
+                    z("div.col-5",
+                        zOpLines,
+                        z("div", z("button#step", "Step")),
+                    ),
                     z("div.col", zCanvas),
                 ),
             );
 
             $("#main").html(zMain);
 
-            $("#main").on("click", ".dropdown-menu li a", function() {
+            $("#main").on("click", ".dropdown-menu li", function() {
                 // Called when any dropdown is click; SET the text and trigger a change
-                let selText = $(this).text();
+                let selText = $(this).find("a").text();
                 $(this).closest(".dropdown-select").find(".dropdown-toggle").text(selText).change();
             });
 
@@ -137,32 +154,34 @@
                         }
                     }),
                 );
+
+                $(".operand").change( function() {
+                    compile();
+                });
+
+                compile();
             });
 
-            // v is the number of variables per cell
-            // n is the number of cells on each axis
-            // d is the pixel dimension of each cell at 1:1 scaling
+            $("#step").click( function() {
+                updateAndRender();
+            });
 
-            v = 4;
-            n = 10;
-            d = 40;
-
-            // TODO: general purpose mat allocator
-            let stateByYXV = [];
+            let stateByYX = [];
             for (let y=0; y < n; y++) {
                 let xs = [];
                 for (let x=0; x < n; x++) {
-                    let state = [];
+                    let state = {
+                        line: 0,
+                        alive: 0,
+                        vars: [],
+                    };
                     for (let i=0; i < v; i++) {
-                        state.push(0);
+                        state.vars.push(0);
                     }
                     xs.push(state);
                 }
-                stateByYXV.push(xs);
+                stateByYX.push(xs);
             }
-
-            stateByYXV[3][5][1] = 1;
-            stateByYXV[3][5][0] = 2;
 
             function createTris(nativeDim) {
                 let halfPi = Math.PI / 2;
@@ -187,10 +206,10 @@
                 }
 
                 let trisByRotAndState = [];
-                for (let rot=0; rot < 4; rot++) {
+                for (let rot=0; rot < v; rot++) {
                     let tris = [];
-                    for (let state=0; state < 4; state ++) {
-                        tri = createTri(rot * halfPi, 360 * state / 4 );
+                    for (let state=0; state < s; state ++) {
+                        let tri = createTri(rot * twoPi / v, 360 * state / s );
                         tris.push(tri);
                     }
                     trisByRotAndState.push(tris);
@@ -199,28 +218,38 @@
                 return trisByRotAndState;
             }
 
-            let mainCanvas = $("#main-canvas")[0];
-            c = mainCanvas.getContext("2d");
-
             let trisByRotAndState = createTris(d);
+
+            let mainCanvas = $("#main-canvas")[0];
+            let c = mainCanvas.getContext("2d");
+
+            c.strokeStyle = "black";
+            c.fillStyle = "black";
+            c.lineWidth = 1;
+            c.font = "normal 16pt Arial";
+
+            let lastTime = performance.now();
 
             function render() {
                 c.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
+
                 c.save();
                     c.scale(1, 1);
+                    let r = 0;//4 * Math.random();
+
+                    // DRAW the cells
                     for (let y=0; y<n; y++) {
                         for (let x=0; x<n; x++) {
-                            c.save();
-                                c.translate(x * d + 4*Math.random(), y * d + 4*Math.random());
+                            if (aliveByYX[y][x]) {
                                 for (let i=0; i<v; i++) {
-                                    c.drawImage(trisByRotAndState[i][stateByYXV[y][x][i]], 0, 0);
+                                    c.drawImage(trisByRotAndState[i][stateByYXV[y][x][i]], x*d+r, y*d+r);
                                 }
-                            c.restore();
+                            }
                         }
                     }
 
-                    c.strokeStyle = "black";
-                    c.lineWidth = 1;
+                    // OVERDRAW the grid
+                    c.beginPath();
                     for (let y=0; y<=n; y++) {
                         c.moveTo(0, y*d+0.5);
                         c.lineTo(n*d, y*d+0.5);
@@ -232,11 +261,91 @@
                         c.lineTo(x*d, n*d);
                         c.stroke();
                     }
+
+                    // DRAW FPS
+                    let now = performance.now();
+                    let fps = 1000.0 / (now - lastTime);
+                    lastTime = now;
+                    // c.fillText(`${fps.toFixed(0)} fps`, 10, 26);
                 c.restore();
-                window.requestAnimationFrame(render);
+
+                //window.requestAnimationFrame(render);
             }
 
-            window.requestAnimationFrame(render);
+            let line = 0;
+
+            function compile() {
+                let lines = [];
+                $("#op-lines").find(".operation").each( (lineI, line) => {
+                    let operation = $(line).text();
+                    let operands = [];
+                    $(line).closest(".op-line").find(".operand").each( (operandI, operand) => {
+                        operands.push($(operand).text());
+                    });
+                    lines.push({operation, operands});
+                });
+
+                //console.log(lines);
+
+                // Transpile one line at a time
+                /*
+                Example:
+                [
+                    1. Replicate East
+                    2. If A < 3 then Goto 5
+                    3. Inc A
+                    4. Goto 2
+                    5. Stop
+                ]
+
+                // Will be code generated
+                let lineFuncs = [
+                    function(state) {
+                        replicate(2);
+                        state.line++;
+                    },
+                    function(state) {
+                        if( state.vars[0] < 3 ) {
+                            state.line = 5 - 1;
+                        }
+                    },
+                    function(state) {
+                        state[0]++;
+                    },
+                    function(state) {
+                        line = 1;
+                    },
+                    function(state) {
+                    },
+                ];
+                */
+
+                // RESTART
+                line = 0;
+                stateByYX[n/2][n/2].alive = 1;
+            }
+
+            function updateCells(state) {
+                for (let y=0; y<n; y++) {
+                    for (let x=0; x<n; x++) {
+                        let state = stateByYX[y][x];
+                        if (state.alive) {
+                            lineFuncs[state.line](state);
+                        }
+                    }
+                }
+            }
+
+            function updateAndRender() {
+                render();
+                line = (line + 1) % l;
+
+            }
+
+            compile();
+            updateAndRender();
+
+            //window.requestAnimationFrame(render);
         });
 
 	</script>
@@ -244,8 +353,3 @@
 <body id="main" class="container">
 </body>
 </html>
-
-
-<!--
-
--->
