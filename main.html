@@ -13,6 +13,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script>
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.3/js/bootstrap.min.js"></script>
 	<script src="./z.js"></script>
+	<script src="./state.js"></script>
+	<script src="./render.js"></script>
 	<style type="text/css">
         #main-canvas {
             width: 100%;
@@ -21,71 +23,8 @@
 	</style>
 	<script>
         $(document).ready(function() {
-            // v is the number of variables per cell
-            // s is the number of states per variable
-            // n is the number of cells on each axis
-            // d is the pixel dimension of each cell at 1:1 scaling
-            // l is the number of instruction lines
-            const v = 2;
-            const s = 8;
-            const n = 30;
-            const d = 20;
-            const l = 4;
 
-            // Each line has one operation
-            // Each operation has zero or more operands
-            // Each operand has a dropdown
-
-            let vars = new Array( v ).fill( 1 ).map( ( _, i ) => String.fromCharCode( 65 + i ) );
-
-            let lines = new Array( l ).fill().map( ( _, i ) => i+1 );
-
-            let operations = {
-                "Replicate": [
-                    {
-                        label: "Direction",
-                    },
-                    {
-                        operand: "Direction",
-                        options: ["West", "North", "East", "South"],
-                    },
-                ],
-                "Increment": [
-                    {
-                        operand: "Variable",
-                        options: vars,
-                    },
-                ],
-                "Goto": [
-                    {
-                        operand: "Line",
-                        options: lines,
-                    },
-                ],
-                "If": [
-                    {
-                        operand: "Left",
-                        options: vars,
-                    },
-                    {
-                        operand: "Cmp",
-                        options: [ "<", "<=", "==", ">=", ">" ],
-                    },
-                    {
-                        operand: "Right",
-                        options: vars,
-                    },
-                    {
-                        label: "Goto",
-                    },
-                    {
-                        operand: "Goto",
-                        options: lines,
-                    },
-                ],
-                "Stop": [
-                ],
-            };
+            stateInit();
 
             function zDropdownSelect(btnClass, title, options) {
                 return z("span.dropdown-select",
@@ -156,125 +95,17 @@
                 );
 
                 $(".operand").change( function() {
-                    compile();
+                    compileFromUI();
                 });
 
-                compile();
+                compileFromUI();
             });
 
             $("#step").click( function() {
                 updateAndRender();
             });
 
-            let stateByYX = [];
-            for (let y=0; y < n; y++) {
-                let xs = [];
-                for (let x=0; x < n; x++) {
-                    let state = {
-                        line: 0,
-                        alive: 0,
-                        vars: [],
-                    };
-                    for (let i=0; i < v; i++) {
-                        state.vars.push(0);
-                    }
-                    xs.push(state);
-                }
-                stateByYX.push(xs);
-            }
-
-            function createTris(nativeDim) {
-                let halfPi = Math.PI / 2;
-                let twoPi = Math.PI * 2;
-
-                function createTri(rot, hue) {
-                    let triCanvas = z("canvas", { width: nativeDim, height: nativeDim } );
-                    let c = triCanvas.getContext("2d");
-                    let d2 = nativeDim / 2;
-                    c.save();
-                        c.translate(d2, d2);
-                        c.rotate(rot);
-                        c.fillStyle = `hsl(${hue}, 100%, 50%)`;
-                        c.beginPath();
-                        c.moveTo(0, 0);
-                        c.lineTo(-d2, -d2);
-                        c.lineTo(-d2, +d2);
-                        c.fill();
-                        c.closePath();
-                    c.restore();
-                    return triCanvas;
-                }
-
-                let trisByRotAndState = [];
-                for (let rot=0; rot < v; rot++) {
-                    let tris = [];
-                    for (let state=0; state < s; state ++) {
-                        let tri = createTri(rot * twoPi / v, 360 * state / s );
-                        tris.push(tri);
-                    }
-                    trisByRotAndState.push(tris);
-                }
-
-                return trisByRotAndState;
-            }
-
-            let trisByRotAndState = createTris(d);
-
-            let mainCanvas = $("#main-canvas")[0];
-            let c = mainCanvas.getContext("2d");
-
-            c.strokeStyle = "black";
-            c.fillStyle = "black";
-            c.lineWidth = 1;
-            c.font = "normal 16pt Arial";
-
-            let lastTime = performance.now();
-
-            function render() {
-                c.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
-
-                c.save();
-                    c.scale(1, 1);
-                    let r = 0;//4 * Math.random();
-
-                    // DRAW the cells
-                    for (let y=0; y<n; y++) {
-                        for (let x=0; x<n; x++) {
-                            if (stateByYX[y][x].alive) {
-                                for (let i=0; i<v; i++) {
-                                    c.drawImage(trisByRotAndState[i][stateByYX[y][x].vars], x*d+r, y*d+r);
-                                }
-                            }
-                        }
-                    }
-
-                    // OVERDRAW the grid
-                    c.beginPath();
-                    for (let y=0; y<=n; y++) {
-                        c.moveTo(0, y*d+0.5);
-                        c.lineTo(n*d, y*d+0.5);
-                        c.stroke();
-                    }
-
-                    for (let x=0; x<=n; x++) {
-                        c.moveTo(x*d, 0);
-                        c.lineTo(x*d, n*d);
-                        c.stroke();
-                    }
-
-                    // DRAW FPS
-                    let now = performance.now();
-                    let fps = 1000.0 / (now - lastTime);
-                    lastTime = now;
-                    // c.fillText(`${fps.toFixed(0)} fps`, 10, 26);
-                c.restore();
-
-                //window.requestAnimationFrame(render);
-            }
-
-            let line = 0;
-
-            function compile() {
+            function compileFromUI() {
                 let rawOpLines = [];
                 $("#op-lines").find(".operation").each( (lineI, line) => {
                     let operation = $(line).text();
@@ -285,96 +116,16 @@
                     rawOpLines.push({operation, operands});
                 });
 
-                /*
-
-                Transpile one line at a time
-
-                Example:
-                [
-                    1. Replicate East
-                    2. If A < 3 then Goto 5
-                    3. Inc A
-                    4. Goto 2
-                    5. Stop
-                ]
-
-                Will code generate the following
-                let lineFuncs = [
-                    function(state) {
-                        replicate(2);
-                        state.line++;
-                    },
-                    function(state) {
-                        if( state.vars[0] < 3 ) {
-                            state.line = 5 - 1;
-                        }
-                    },
-                    function(state) {
-                        state[0]++;
-                    },
-                    function(state) {
-                        line = 1;
-                    },
-                    function(state) {
-                    },
-                ];
-
-                */
-
-                let lineFuncs = rawOpLines.map( (opLine) => {
-                    console.log(opLine);
-                    switch(opLine.operation) {
-                        case "Replicate":
-                            const dirNameToNumber = {
-                                "West": 0,
-                                "North": 1,
-                                "East": 2,
-                                "South": 3,
-                            }
-                            let dirName = opLine.operands[0];
-                            return `function(state){ replicate(${dirNameToNumber[dirName]}); state.line++; }`;
-                        case "Increment":
-                            const varNameToOffset = {
-                                "A": 0,
-                                "B": 1,
-                            }
-                            let varOffset = varNameToOffset[opLine.operands[0]];
-                            return `function(state){ state.vars[${varOffset}]++; state.line++; }`;
-                        case "Goto":
-                            let gotoLine = opLine.operands[0];
-                            return `function(state){ state.line = ${gotoLine}; }`;
-                    }
-                });
-                console.log(lineFuncs);
-                let codeBlock = lineFuncs.join("\n");
+                stateCompile(rawOpLines);
+                stateRestart();
             }
 
-            function restart() {
-                line = 0;
-                stateByYX[n/2][n/2].alive = 1;
-            }
-
-            function updateCells(state) {
-                for (let y=0; y<n; y++) {
-                    for (let x=0; x<n; x++) {
-                        let state = stateByYX[y][x];
-                        if (state.alive) {
-                            lineFuncs[state.line](state);
-                        }
-                    }
-                }
-            }
+            renderInit($("#main-canvas")[0]);
 
             function updateAndRender() {
+                stateUpdate();
                 render();
-                line = (line + 1) % l;
-
             }
-
-            compile();
-            updateAndRender();
-
-            //window.requestAnimationFrame(render);
         });
 
 	</script>
