@@ -240,9 +240,9 @@
                     // DRAW the cells
                     for (let y=0; y<n; y++) {
                         for (let x=0; x<n; x++) {
-                            if (aliveByYX[y][x]) {
+                            if (stateByYX[y][x].alive) {
                                 for (let i=0; i<v; i++) {
-                                    c.drawImage(trisByRotAndState[i][stateByYXV[y][x][i]], x*d+r, y*d+r);
+                                    c.drawImage(trisByRotAndState[i][stateByYX[y][x].vars], x*d+r, y*d+r);
                                 }
                             }
                         }
@@ -275,20 +275,20 @@
             let line = 0;
 
             function compile() {
-                let lines = [];
+                let rawOpLines = [];
                 $("#op-lines").find(".operation").each( (lineI, line) => {
                     let operation = $(line).text();
                     let operands = [];
                     $(line).closest(".op-line").find(".operand").each( (operandI, operand) => {
                         operands.push($(operand).text());
                     });
-                    lines.push({operation, operands});
+                    rawOpLines.push({operation, operands});
                 });
 
-                //console.log(lines);
-
-                // Transpile one line at a time
                 /*
+
+                Transpile one line at a time
+
                 Example:
                 [
                     1. Replicate East
@@ -298,7 +298,7 @@
                     5. Stop
                 ]
 
-                // Will be code generated
+                Will code generate the following
                 let lineFuncs = [
                     function(state) {
                         replicate(2);
@@ -318,9 +318,38 @@
                     function(state) {
                     },
                 ];
+
                 */
 
-                // RESTART
+                let lineFuncs = rawOpLines.map( (opLine) => {
+                    console.log(opLine);
+                    switch(opLine.operation) {
+                        case "Replicate":
+                            const dirNameToNumber = {
+                                "West": 0,
+                                "North": 1,
+                                "East": 2,
+                                "South": 3,
+                            }
+                            let dirName = opLine.operands[0];
+                            return `function(state){ replicate(${dirNameToNumber[dirName]}); state.line++; }`;
+                        case "Increment":
+                            const varNameToOffset = {
+                                "A": 0,
+                                "B": 1,
+                            }
+                            let varOffset = varNameToOffset[opLine.operands[0]];
+                            return `function(state){ state.vars[${varOffset}]++; state.line++; }`;
+                        case "Goto":
+                            let gotoLine = opLine.operands[0];
+                            return `function(state){ state.line = ${gotoLine}; }`;
+                    }
+                });
+                console.log(lineFuncs);
+                let codeBlock = lineFuncs.join("\n");
+            }
+
+            function restart() {
                 line = 0;
                 stateByYX[n/2][n/2].alive = 1;
             }
