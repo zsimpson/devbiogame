@@ -12,10 +12,22 @@ let stateByYX = [];
 
 let stateVarNames = new Array( v ).fill( 1 ).map( ( _, i ) => String.fromCharCode( 65 + i ) );
 
-// TODO: Correct loop here:
-let stateVarOffsetByVarName = { "A": 0, "B": 1 }
+let stateVarOffsetByVarName = {}
+for (i in stateVarNames) {
+    stateVarOffsetByVarName[stateVarNames[i]] = i;
+}
 
 const lines = new Array( l ).fill().map( ( _, i ) => i+1 );
+
+const dirNames = ["West", "North", "East", "South"];
+const dirNameToNumber = {
+    "West": 0,
+    "North": 1,
+    "East": 2,
+    "South": 3,
+}
+const dirX = [ -1, 0, 1, 0 ];
+const dirY = [ 0, -1, 0, 1 ];
 
 const operations = {
     "Replicate": [
@@ -24,7 +36,7 @@ const operations = {
         },
         {
             operand: "Direction",
-            options: ["West", "North", "East", "South"],
+            options: dirNames,
         },
     ],
     "Increment": [
@@ -65,12 +77,17 @@ const operations = {
 };
 
 function stateInit() {
+    stateByYX = [];
+
     for (let y=0; y < n; y++) {
         let xs = [];
         for (let x=0; x < n; x++) {
             let state = {
                 line: 0,
-                alive: 0,
+                render: false,
+                update: false,
+                x: x,
+                y: y,
                 vars: [],
             };
             for (let i=0; i < v; i++) {
@@ -80,6 +97,10 @@ function stateInit() {
         }
         stateByYX.push(xs);
     }
+
+    let centerState = stateByYX[n/2][n/2];
+    centerState.update = true;
+    centerState.render = true;
 }
 
 let _lineFuncs = [];
@@ -120,59 +141,41 @@ function stateCompile(rawOpLines) {
     */
 
     let lineFuncStrs = rawOpLines.map( (opLine) => {
-        //console.log(opLine);
         switch(opLine.operation) {
             case "Replicate":
-                const dirNameToNumber = {
-                    "West": 0,
-                    "North": 1,
-                    "East": 2,
-                    "South": 3,
-                }
                 let dirName = opLine.operands[0];
-                //let a = `replicate(${dirNameToNumber[dirName]}); state.line++;`;
-                let a = `state.line++;`;
-                console.log(a);
-                return a;
-            /*
+                return `replicate(${dirNameToNumber[dirName]}, state); state.line++;`;
             case "Increment":
-                const varNameToOffset = {
-                    "A": 0,
-                    "B": 1,
-                }
-                let varOffset = varNameToOffset[opLine.operands[0]];
+                let varOffset = stateVarOffsetByVarName[opLine.operands[0]];
                 return `state.vars[${varOffset}]++; state.line++;`;
             case "Goto":
                 let gotoLine = opLine.operands[0];
                 return `state.line = ${gotoLine};`;
-            */
+            case "Stop":
+                let stopLine = opLine.operands[0];
+                return `state.update = false;`;
         }
     });
 
-    _lineFuncs = [];
-    for(lineFuncStr in lineFuncStrs) {
-        _lineFuncs.push(Function("state", lineFuncStr));
+    _lineFuncs = lineFuncStrs.map( (i) => Function("state", i) );
+}
+
+function replicate(dir, srcState) {
+    let dstX = srcState.x + dirX[dir];
+    let dstY = srcState.y + dirY[dir];
+    if (0 <= dstX && dstX < n && 0 <= dstY && dstY < n) {
+        stateByYX[dstY][dstX].update = true;
+        stateByYX[dstY][dstX].render = true;
+        stateByYX[dstY][dstX].line = srcState.line;
     }
-    debugger;
-}
-
-function replicate(dir) {
-    console.log("replicate", dir);
-}
-
-function stateRestart() {
-    stateByYX[n/2][n/2].alive = 1;
 }
 
 function stateUpdate() {
     for (let y=0; y<n; y++) {
         for (let x=0; x<n; x++) {
             let state = stateByYX[y][x];
-            if (state.alive) {
-                debugger;
-                console.log("old state", state);
+            if (state.update) {
                 _lineFuncs[state.line](state);
-                console.log("new state", state);
             }
         }
     }

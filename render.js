@@ -66,7 +66,7 @@ function render() {
         for (let y=0; y<n; y++) {
             for (let x=0; x<n; x++) {
                 let state = stateByYX[y][x];
-                if (state.alive) {
+                if (state.render) {
                     for (let i=0; i<v; i++) {
                         _c.drawImage(_trisByRotAndState[i][state.vars[i]], x*d+r, y*d+r);
                     }
