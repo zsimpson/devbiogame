@@ -5,7 +5,7 @@
 
 const v = 2;
 const s = 8;
-const n = 30;
+const n = 50;
 const l = 4;
 
 let stateByYX = [];
@@ -29,11 +29,13 @@ const dirNameToNumber = {
 const dirX = [ -1, 0, 1, 0 ];
 const dirY = [ 0, -1, 0, 1 ];
 
-const operations = {
+// When the operationsVersion is incremented, it invalidates the save state
+const opsVersion = 1;
+
+const opsDefaults = {
+    // Each of the following arrays is called an "opState".
+    // The initial state of each operand is a descriptive default. eg "Direction" as opposed to "East", "West", etc
     "Replicate": [
-        {
-            label: "Direction",
-        },
         {
             operand: "Direction",
             options: dirNames,
@@ -65,11 +67,8 @@ const operations = {
             options: stateVarNames,
         },
         {
-            label: "Goto",
-        },
-        {
             operand: "Goto",
-            options: lines,
+            options: lines.map( i => `Goto ${i}` ),
         },
     ],
     "Stop": [
@@ -98,24 +97,21 @@ function stateInit() {
         stateByYX.push(xs);
     }
 
-    let centerState = stateByYX[n/2][n/2];
+    let centerState = stateByYX[0][n/2];
     centerState.update = true;
     centerState.render = true;
 }
 
 let _lineFuncs = [];
 
-function stateCompile(rawOpLines) {
+function stateCompile(opStates) {
     /*
-    Transpile one line at a time
+    Transpile one line at a time into Function(state)
 
     Example:
     [
-        1. Replicate East
-        2. If A < 3 then Goto 5
-        3. Inc A
-        4. Goto 2
-        5. Stop
+        Replicate East
+        If A < 3 then Goto 5
     ]
 
     Will code generate the following
@@ -129,30 +125,22 @@ function stateCompile(rawOpLines) {
                 state.line = 5 - 1;
             }
         },
-        function(state) {
-            state[0]++;
-        },
-        function(state) {
-            line = 1;
-        },
-        function(state) {
-        },
     ];
     */
 
-    let lineFuncStrs = rawOpLines.map( (opLine) => {
+    let lineFuncStrs = opStates.map( (opLine) => {
         switch(opLine.operation) {
             case "Replicate":
-                let dirName = opLine.operands[0];
+                let dirName = opLine.operands[0].operand;
                 return `replicate(${dirNameToNumber[dirName]}, state); state.line++;`;
             case "Increment":
-                let varOffset = stateVarOffsetByVarName[opLine.operands[0]];
+                let varOffset = stateVarOffsetByVarName[opLine.operands[0].operand];
                 return `state.vars[${varOffset}]++; state.line++;`;
             case "Goto":
-                let gotoLine = opLine.operands[0];
+                let gotoLine = opLine.operands[0].operand;
                 return `state.line = ${gotoLine};`;
             case "Stop":
-                let stopLine = opLine.operands[0];
+                let stopLine = opLine.operands[0].operand;
                 return `state.update = false;`;
         }
     });
@@ -176,6 +164,7 @@ function stateUpdate() {
             let state = stateByYX[y][x];
             if (state.update) {
                 _lineFuncs[state.line](state);
+                state.line = state.line % l;
             }
         }
     }

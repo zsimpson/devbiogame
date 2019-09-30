@@ -8,11 +8,12 @@
 	<link rel="icon" href="data:;base64,iVBORw0KGgo=">
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.2.1/css/bootstrap.min.css" integrity="sha384-GJzZqFGwb1QTTN6wy59ffF1BuGJpLSa9DkKMp0DgiMDm4iYMj70gZWKYbI706tWS" crossorigin="anonymous">
 	<link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/themes/smoothness/jquery-ui.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
 	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
 	<script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script>
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.3/js/bootstrap.min.js"></script>
-	<script src="./z.js"></script>
+    <script src="./z.js"></script>
 	<script src="./state.js"></script>
 	<script src="./render.js"></script>
 	<style type="text/css">
@@ -26,15 +27,13 @@
 
         $(document).ready(function() {
 
-            //debugger;
-            //let f = Function("s", "console.log(ss); console.log(s)");
-            //f(2);
-
             stateInit();
 
             function zDropdownSelect(btnClass, title, options) {
-                return z("span.dropdown-select",
-                    z(`a.btn.btn-primary.dropdown-toggle${btnClass}`,
+                // Make a dropdown select menu with title and options
+                // When clicked, the title will become the selected option.
+                return z("div.dropdown-select",
+                    z(`a.btn.dropdown-toggle${btnClass}`,
                         {
                             data: { toggle: "dropdown" },
                             href: "#",
@@ -49,31 +48,34 @@
                 );
             }
 
-            function zOpLine(lineI) {
-                return z("li.list-group-item",
-                    z("span.badge.badge-primary.badge-pill", `${lineI + 1}`),
-                    z("div.btn-group.op-line",
-                        zDropdownSelect(".operation", "Operation", Object.keys(operations)),
-                        z("div.operands"),
-                    )
-                );
-            }
-
-            let zOpLines = z("ul.list-group#op-lines",
-                Array(4).fill().map( (_, i) => {
-                    return zOpLine(i);
-                }),
-            );
-
             let zCanvas = z("canvas#main-canvas", {width: n * d, height: n * d});
 
-            let zMain = z("div.container-fluid.p-3",
+            let zMain = z("div.p-3",
                 z("div.row",
-                    z("div.col-5",
-                        zOpLines,
-                        z("div", z("button#step", "Step")),
+                    z("div.col-4",
+                        z("div#op-lines-container"),
                     ),
-                    z("div.col", zCanvas),
+                    z("div.col",
+                        z("div.btn-toolbar.mb-2",
+                            z("button.btn.btn-success.mr-2#step", {type:"button"},
+                                z("span.fa.fa-step-forward.mr-2", {"aria-hidden":"true"}),
+                                "Step"
+                            ),
+                            z("button.btn.btn-success.mr-2#play", {type:"button"},
+                                z("span.fa.fa-play.mr-2", {"aria-hidden":"true"}),
+                                "Play"
+                            ),
+                            z("button.btn.btn-success.mr-2#pause", {type:"button"},
+                                z("span.fa.fa-pause.mr-2", {"aria-hidden":"true"}),
+                                "Pause"
+                            ),
+                            z("button.btn.btn-success.mr-2#clear", {type:"button"},
+                                z("span.fa.fa-stop.mr-2", {"aria-hidden":"true"}),
+                                "Clear"
+                            ),
+                        ),
+                        z("div", zCanvas),
+                    ),
                 ),
             );
 
@@ -81,70 +83,158 @@
 
             $("#main").on("click", ".dropdown-menu li", function() {
                 // Called when any dropdown is click; SET the text and trigger a change
+                // This is generic to all dropdowns. The .change() callbacks on
+                // specific dropdown classes is what implements the business logic
+                // for each kind of dropdown.
                 let selText = $(this).find("a").text();
                 $(this).closest(".dropdown-select").find(".dropdown-toggle").text(selText).change();
             });
 
-            $(".operation").change( function() {
-                // Called when any operation changes; REPLACE the operands
-                let operation = $(this).text();
-                let operandDicts = operations[operation];
-                $(this).closest(".op-line").find(".operands").html(
-                    operandDicts.map( (operandDict) => {
-                        if("label" in operandDict) {
-                            return z("span", `${operandDict.label}:`);
-                        }
-                        else {
-                            return zDropdownSelect(".operand", operandDict.operand, operandDict.options);
-                        }
-                    }),
-                );
+            function zOperands(operands) {
+                // opState is an array of objects like: { operand: "Variable", options: stateVarNames }
+                // In the case that this is generic (not from a saved state) then the
+                // operand will be something like: "Direction". But once it is set it will be like "West".
 
-                $(".operand").change( function() {
-                    compileFromUI();
+                return operands.map( (operand) => {
+                    if("label" in operand) {
+                        return z("span", `${operand.label}:`);
+                    }
+                    else {
+                        return z("div.btn-group.mr-2",
+                            zDropdownSelect(".operand.btn-info", operand.operand, operand.options)
+                        );
+                    }
                 });
-
-                compileFromUI();
-            });
-
-            $("#step").click( function() {
-                updateAndRender();
-            });
-
-            function compileFromUI() {
-                let rawOpLines = [];
-                $("#op-lines").find(".operation").each( (lineI, line) => {
-                    let operation = $(line).text();
-                    let operands = [];
-                    $(line).closest(".op-line").find(".operand").each( (operandI, operand) => {
-                        operands.push($(operand).text());
-                    });
-                    rawOpLines.push({operation, operands});
-                });
-
-                stateCompile(rawOpLines);
-                stateInit();
             }
 
-            renderInit($("#main-canvas")[0]);
+            function zOpLines(opStates) {
+                // opStates is a list of opStates
+                return z("ul.list-group#op-lines",
+                    opStates.map( (opState, i) => {
+                        // Make a operation line which is a line number, an operation dropdown, and
+                        // a list of operand dropdowns.
+                        return z("li.list-group-item.d-flex.align-items-center",
+                            z("span.badge.badge-secondary.badge-pill.mr-4", `${i + 1}`),
+                            z("div.btn-toolbar.op-line",
+                                z("div.btn-group.mr-2",
+                                   zDropdownSelect(".operation.btn-primary", opState.operation, Object.keys(opsDefaults)),
+                                ),
+                                z("div.operands",
+                                    zOperands(opState.operands)
+                                ),
+                            ),
+                        );
+                    }),
+                );
+            }
+
+            $("#main").on("change", ".operation", function() {
+                // Called when any operation changes; REPLACE the operands
+                let operation = $(this).text();
+                let operands = opsDefaults[operation];
+                $(this).closest(".op-line").find(".operands").html(
+                    zOperands(operands),
+                );
+            });
+
+            $("#main").on("change", ".operand", function() {
+                compileFromUI();
+            });
 
             function updateAndRender() {
                 stateUpdate();
                 render();
             }
+
+            function buttonPlayState(play) {
+                if(play) {
+                    $("#pause").addClass("d-none");
+                    $("#play").removeClass("d-none");
+                }
+                else {
+                    $("#pause").removeClass("d-none");
+                    $("#play").addClass("d-none");
+                }
+            }
+
+            buttonPlayState(true);
+
+            $("#step").click(function() {
+                updateAndRender();
+            });
+
+            let runnerHandle = null;
+            $("#play").click( function() {
+                buttonPlayState(false);
+                runnerHandle = setInterval(updateAndRender, 1);
+            });
+
+            $("#pause").click( function() {
+                buttonPlayState(true);
+                clearInterval(runnerHandle);
+                runnerHandle = null;
+            });
+
+            $("#clear").click( function() {
+                buttonPlayState(true);
+                clearInterval(runnerHandle);
+                stateInit();
+                render();
+            });
+
+            function compileFromUI() {
+                let opStates = $("#op-lines-container").find(".operation").map( function() {
+                    let operation = $(this).text();
+                    let operands = $(this).closest(".op-line").find(".operand").map( function(i) {
+                        return {
+                            operand: $(this).text(),
+                            options: opsDefaults[operation][i].options,
+                        }
+                    }).get();
+                    return {operation, operands};
+                }).get();
+
+                window.localStorage.setItem("savedOpsVersion", JSON.stringify(opsVersion));
+                window.localStorage.setItem("savedOpsStates", JSON.stringify(opStates));
+
+                stateCompile(opStates);
+                stateInit();
+            }
+
+
+            // LOAD saved opStates or invalidate if version does not match
+            let savedOpsVersion = window.localStorage.getItem("savedOpsVersion");
+            let savedOpsStates = window.localStorage.getItem("savedOpsStates");
+            if (savedOpsVersion != opsVersion ) {
+                savedOpsStates = new Array(4).fill().map( (_,i) => {
+                    return {
+                        operation: "Operation",
+                        operands: [],
+                    }
+                });
+            }
+            else {
+                savedOpsStates = JSON.parse(savedOpsStates);
+            }
+
+            // SETUP the UI state from the loaded savedOpsStates
+            $("#op-lines-container").html(
+                zOpLines(savedOpsStates)
+            );
+
+            renderInit($("#main-canvas")[0]);
+            compileFromUI();
+            render();
         });
 
 	</script>
 </head>
 <body>
-    <div id="main" class="container"></div>
+    <div id="main"></div>
     <div>
         <h2>To Do</h2>
         <ol>
-            <li>Save/Restore program</li>
             <li>Contention rules</li>
-            <li>Run (not just step)</li>
-            <li>Format the op lines better</li>
             <li>Concept of a level (n, may change, some things allowed others not, num lines)</li>
             <li>Code line delete, add, etc.</li>
             <li>Setup an s3 bucket to server this</li>
