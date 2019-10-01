@@ -21,12 +21,17 @@
             width: 100%;
             height: auto;
         }
-	</style>
+        .level-header {
+            margin-top: 200px;
+        }
+    </style>
 	<script>
 	    //let ss = { a:1 };
 
         $(document).ready(function() {
 
+            // Select any level to get thigns initialized
+            stateSetLevel("Alternator");
             stateInit();
 
             function zDropdownSelect(btnClass, title, options) {
@@ -48,12 +53,18 @@
                 );
             }
 
-            let zCanvas = z("canvas#main-canvas", {width: n * d, height: n * d});
+            let zCanvas = z("canvas#main-canvas");
 
             let zMain = z("div.p-3",
                 z("div.row",
                     z("div.col-4",
                         z("div#op-lines-container"),
+                        z("h2.level-header", "Levels"),
+                        z("ul.list-group#levels",
+                            levels.map( (level) => {
+                                return z("li.list-group-item.level-name", level.name);
+                            }),
+                        ),
                     ),
                     z("div.col",
                         z("div.btn-toolbar.mb-2",
@@ -141,6 +152,10 @@
                 compileFromUI();
             });
 
+            $(".level-name").click( function() {
+                setLevelByName($(this).text());
+            });
+
             function updateAndRender() {
                 stateUpdate();
                 render();
@@ -201,7 +216,6 @@
                 stateInit();
             }
 
-
             // LOAD saved opStates or invalidate if version does not match
             let savedOpsVersion = window.localStorage.getItem("savedOpsVersion");
             let savedOpsStates = window.localStorage.getItem("savedOpsStates");
@@ -222,9 +236,22 @@
                 zOpLines(savedOpsStates)
             );
 
-            renderInit($("#main-canvas")[0]);
-            compileFromUI();
-            render();
+            function setLevelByName(name) {
+                $(".level-name").removeClass("active");
+                $(".level-name").filter( function() {
+                    return $(this).text() == name
+                }).addClass("active");
+                stateSetLevel(name);
+
+                let canvas = $("#main-canvas")[0];
+                $(canvas).prop("width", level.n * d);
+                $(canvas).prop("height", level.n * d);
+                renderInit(canvas);
+                compileFromUI();
+                render();
+            }
+
+            setLevelByName("Alternator");
         });
 
 	</script>
@@ -236,6 +263,7 @@
         <ol>
             <li>Concept of a level (n, may change, some things allowed others not, num lines)</li>
             <li>Code line delete, add, etc.</li>
+            <li>Figure out z-ordering problems of dropdowns</li>
         </ol>
     </div>
 </body>

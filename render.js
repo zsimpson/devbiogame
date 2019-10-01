@@ -23,12 +23,36 @@ function _createTris(nativeDim) {
         return triCanvas;
     }
 
+    function createQuad(hue) {
+        let quadCanvas = z("canvas", { width: nativeDim, height: nativeDim } );
+        let _c = quadCanvas.getContext("2d");
+        let d2 = nativeDim / 2;
+        _c.save();
+            _c.translate(d2, d2);
+            _c.fillStyle = `hsl(${hue}, 100%, 50%)`;
+            _c.beginPath();
+            _c.moveTo(-d2, -d2);
+            _c.lineTo(+d2, -d2);
+            _c.lineTo(+d2, +d2);
+            _c.lineTo(-d2, +d2);
+            _c.fill();
+            _c.closePath();
+        _c.restore();
+        return quadCanvas;
+    }
+
     let trisByRotAndState = [];
-    for (let rot=0; rot < v; rot++) {
+    for (let rot=0; rot < level.v; rot++) {
         let tris = [];
-        for (let state=0; state < s; state ++) {
-            let tri = createTri(rot * twoPi / v, 360 * state / s );
-            tris.push(tri);
+        for (let state=0; state < level.s; state ++) {
+            let poly = null
+            if(level.v == 1) {
+                poly = createQuad(360 * state / level.s);
+            }
+            else {
+                poly = createTri(rot * twoPi / level.v, 360 * state / level.s);
+            }
+            tris.push(poly);
         }
         trisByRotAndState.push(tris);
     }
@@ -36,13 +60,14 @@ function _createTris(nativeDim) {
     return trisByRotAndState;
 }
 
-const _trisByRotAndState = _createTris(d);
-
+let _trisByRotAndState = null;
 let _mainCanvas = null;
 let _lastTime = null;
 let _c = null;
 
 function renderInit(mainCanvas) {
+    _trisByRotAndState = _createTris(d);
+
     _mainCanvas = mainCanvas;
     _c = mainCanvas.getContext("2d");
 
@@ -63,11 +88,11 @@ function render() {
         let r = 0;//4 * Math.random();
 
         // DRAW the cells
-        for (let y=0; y<n; y++) {
-            for (let x=0; x<n; x++) {
+        for (let y=0; y < level.n; y++) {
+            for (let x=0; x < level.n; x++) {
                 let state = stateByYX[y][x];
                 if (state.render) {
-                    for (let i=0; i<v; i++) {
+                    for (let i=0; i < level.v; i++) {
                         _c.drawImage(_trisByRotAndState[i][state.vars[i]], x*d+r, y*d+r);
                     }
                 }
@@ -76,15 +101,15 @@ function render() {
 
         // OVERDRAW the grid
         _c.beginPath();
-        for (let y=0; y<=n; y++) {
+        for (let y=0; y <= level.n; y++) {
             _c.moveTo(0, y*d+0.5);
-            _c.lineTo(n*d, y*d+0.5);
+            _c.lineTo(level.n*d, y*d+0.5);
             _c.stroke();
         }
 
-        for (let x=0; x<=n; x++) {
+        for (let x=0; x <= level.n; x++) {
             _c.moveTo(x*d, 0);
-            _c.lineTo(x*d, n*d);
+            _c.lineTo(x*d, level.n*d);
             _c.stroke();
         }
 
