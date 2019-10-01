@@ -8,6 +8,7 @@ const s = 8;
 const n = 50;
 const l = 4;
 
+let requestsByYX = [];
 let stateByYX = [];
 
 let stateVarNames = new Array( v ).fill( 1 ).map( ( _, i ) => String.fromCharCode( 65 + i ) );
@@ -135,13 +136,14 @@ function stateCompile(opStates) {
                 return `replicate(${dirNameToNumber[dirName]}, state); state.line++;`;
             case "Increment":
                 let varOffset = stateVarOffsetByVarName[opLine.operands[0].operand];
-                return `state.vars[${varOffset}]++; state.line++;`;
+                return `state.vars[${varOffset}] = (state.vars[${varOffset}] + 1) % s; state.line++;`;
             case "Goto":
                 let gotoLine = opLine.operands[0].operand;
                 return `state.line = ${gotoLine};`;
             case "Stop":
-                let stopLine = opLine.operands[0].operand;
                 return `state.update = false;`;
+            default:
+                return `state.line++;`;
         }
     });
 
@@ -152,19 +154,47 @@ function replicate(dir, srcState) {
     let dstX = srcState.x + dirX[dir];
     let dstY = srcState.y + dirY[dir];
     if (0 <= dstX && dstX < n && 0 <= dstY && dstY < n) {
-        stateByYX[dstY][dstX].update = true;
-        stateByYX[dstY][dstX].render = true;
-        stateByYX[dstY][dstX].line = srcState.line;
+        if( ! stateByYX[dstY][dstX].render) {
+            // If it has never been alive then it can be requested
+            requestsByYX[dstY][dstX].push(srcState);
+        }
     }
 }
 
 function stateUpdate() {
+    requestsByYX = [];
+    for (let y=0; y<n; y++) {
+        let requestX = [];
+        for (let x=0; x<n; x++) {
+            requestX.push([]);
+        }
+        requestsByYX.push(requestX);
+    }
+
     for (let y=0; y<n; y++) {
         for (let x=0; x<n; x++) {
             let state = stateByYX[y][x];
             if (state.update) {
                 _lineFuncs[state.line](state);
                 state.line = state.line % l;
+            }
+        }
+    }
+
+    // Activate any without contention
+    for (let y=0; y<n; y++) {
+        for (let x=0; x<n; x++) {
+            let requests = requestsByYX[y][x];
+            if (requests.length == 1) {
+                // Inherit memory state but not line
+                let request = requests[0];
+                let state = stateByYX[y][x];
+                for (let i=0; i < v; i++) {
+                    state.vars[i] = request.vars[i];
+                }
+                state.line = 0;
+                state.render = true;
+                state.update = true;
             }
         }
     }
