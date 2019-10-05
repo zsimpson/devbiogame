@@ -1,7 +1,7 @@
 // d is the pixel dimension of each cell at 1:1 scaling
 const d = 20;
 
-function _createTris(nativeDim) {
+function _createTris(nativeDim, level) {
     let halfPi = Math.PI / 2;
     let twoPi = Math.PI * 2;
 
@@ -65,8 +65,8 @@ let _mainCanvas = null;
 let _lastTime = null;
 let _c = null;
 
-function renderInit(mainCanvas) {
-    _trisByRotAndState = _createTris(d);
+function renderInit(mainCanvas, level) {
+    _trisByRotAndState = _createTris(d, level);
 
     _mainCanvas = mainCanvas;
     _c = mainCanvas.getContext("2d");
@@ -80,7 +80,7 @@ function renderInit(mainCanvas) {
 }
 
 
-function render() {
+function render(level) {
     _c.clearRect(0, 0, _mainCanvas.width, _mainCanvas.height);
 
     _c.save();

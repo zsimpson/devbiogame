@@ -26,13 +26,7 @@
         }
     </style>
 	<script>
-	    //let ss = { a:1 };
-
         $(document).ready(function() {
-
-            // Select any level to get thigns initialized
-            stateSetLevel("Alternator");
-            stateInit();
 
             function zDropdownSelect(btnClass, title, options) {
                 // Make a dropdown select menu with title and options
@@ -58,13 +52,11 @@
             let zMain = z("div.p-3",
                 z("div.row",
                     z("div.col-4",
-                        z("div#op-lines-container"),
+                        z("div#program-container"),
+
                         z("h2.level-header", "Levels"),
-                        z("ul.list-group#levels",
-                            levels.map( (level) => {
-                                return z("li.list-group-item.level-name", level.name);
-                            }),
-                        ),
+                        z("div#levels-container"),
+
                     ),
                     z("div.col",
                         z("div.btn-toolbar.mb-2",
@@ -102,10 +94,6 @@
             });
 
             function zOperands(operands) {
-                // opState is an array of objects like: { operand: "Variable", options: stateVarNames }
-                // In the case that this is generic (not from a saved state) then the
-                // operand will be something like: "Direction". But once it is set it will be like "West".
-
                 return operands.map( (operand) => {
                     if("label" in operand) {
                         return z("span", `${operand.label}:`);
@@ -118,20 +106,21 @@
                 });
             }
 
-            function zOpLines(opStates) {
-                // opStates is a list of opStates
-                return z("ul.list-group#op-lines",
-                    opStates.map( (opState, i) => {
-                        // Make a operation line which is a line number, an operation dropdown, and
-                        // a list of operand dropdowns.
+            function zProgramLines(program) {
+                return z("ul.list-group#program-lines",
+                    program.lines.map( (line, i) => {
                         return z("li.list-group-item.d-flex.align-items-center",
                             z("span.badge.badge-secondary.badge-pill.mr-4", `${i + 1}`),
                             z("div.btn-toolbar.op-line",
                                 z("div.btn-group.mr-2",
-                                   zDropdownSelect(".operation.btn-primary", opState.operation, Object.keys(opsDefaults)),
+                                   zDropdownSelect(
+                                        ".operation.btn-primary",
+                                        line.operation,
+                                        program.allowedOperations.map( op => op.name )
+                                   ),
                                 ),
                                 z("div.operands",
-                                    zOperands(opState.operands)
+                                    zOperands(line.operands)
                                 ),
                             ),
                         );
@@ -139,66 +128,16 @@
                 );
             }
 
-            $("#main").on("change", ".operation", function() {
-                // Called when any operation changes; REPLACE the operands
-                let operation = $(this).text();
-                let operands = opsDefaults[operation];
-                $(this).closest(".op-line").find(".operands").html(
-                    zOperands(operands),
+            function zLevels(levels) {
+                return z("ul.list-group#levels",
+                    levels.map( (level) => {
+                        return z("li.list-group-item.level-name", level.name);
+                    }),
                 );
-            });
-
-            $("#main").on("change", ".operand, .operation", function() {
-                compileFromUI();
-            });
-
-            $(".level-name").click( function() {
-                setLevelByName($(this).text());
-            });
-
-            function updateAndRender() {
-                stateUpdate();
-                render();
             }
 
-            function buttonPlayState(play) {
-                if(play) {
-                    $("#pause").addClass("d-none");
-                    $("#play").removeClass("d-none");
-                }
-                else {
-                    $("#pause").removeClass("d-none");
-                    $("#play").addClass("d-none");
-                }
-            }
-
-            buttonPlayState(true);
-
-            $("#step").click(function() {
-                updateAndRender();
-            });
-
-            let runnerHandle = null;
-            $("#play").click( function() {
-                buttonPlayState(false);
-                runnerHandle = setInterval(updateAndRender, 1);
-            });
-
-            $("#pause").click( function() {
-                buttonPlayState(true);
-                clearInterval(runnerHandle);
-                runnerHandle = null;
-            });
-
-            $("#clear").click( function() {
-                buttonPlayState(true);
-                clearInterval(runnerHandle);
-                stateInit();
-                render();
-            });
-
-            function compileFromUI() {
-                let opStates = $("#op-lines-container").find(".operation").map( function() {
+            function saveGameFromUI() {
+                let programState = $("#program-container").find(".operation").map( function() {
                     let operation = $(this).text();
                     let operands = $(this).closest(".op-line").find(".operand").map( function(i) {
                         return {
@@ -209,49 +148,80 @@
                     return {operation, operands};
                 }).get();
 
-                window.localStorage.setItem("savedOpsVersion", JSON.stringify(opsVersion));
-                window.localStorage.setItem("savedOpsStates", JSON.stringify(opStates));
-
-                stateCompile(opStates);
-                stateInit();
+                stateUpdateSaveGameFromUI({programState});
             }
 
-            // LOAD saved opStates or invalidate if version does not match
-            let savedOpsVersion = window.localStorage.getItem("savedOpsVersion");
-            let savedOpsStates = window.localStorage.getItem("savedOpsStates");
-            if (savedOpsVersion != opsVersion ) {
-                savedOpsStates = new Array(4).fill().map( (_,i) => {
-                    return {
-                        operation: "Operation",
-                        operands: [],
+            function createUI(uiState) {
+                function updateAndRender() {
+                    stateUpdate();
+                    render(uiState.level);
+                }
+
+                function buttonPlayState(play) {
+                    if(play) {
+                        $("#pause").addClass("d-none");
+                        $("#play").removeClass("d-none");
                     }
-                });
-            }
-            else {
-                savedOpsStates = JSON.parse(savedOpsStates);
-            }
+                    else {
+                        $("#pause").removeClass("d-none");
+                        $("#play").addClass("d-none");
+                    }
+                }
 
-            // SETUP the UI state from the loaded savedOpsStates
-            $("#op-lines-container").html(
-                zOpLines(savedOpsStates)
-            );
+                $("#level-container").html(
+                    zLevels(uiState.levels)
+                );
 
-            function setLevelByName(name) {
-                $(".level-name").removeClass("active");
-                $(".level-name").filter( function() {
-                    return $(this).text() == name
-                }).addClass("active");
-                stateSetLevel(name);
+                $("#program-container").html(
+                    zProgramLines(uiState.program)
+                );
 
                 let canvas = $("#main-canvas")[0];
-                $(canvas).prop("width", level.n * d);
-                $(canvas).prop("height", level.n * d);
-                renderInit(canvas);
-                compileFromUI();
-                render();
+                $(canvas).prop("width", uiState.level.n * d);
+                $(canvas).prop("height", uiState.level.n * d);
+
+                $("#main").on("change", ".operation", function() {
+                    // Called when any operation changes; REPLACE the operands
+                    let operation = $(this).text();
+                    let op = uiState.program.allowedOperations.find( allowed => allowed.name == operation );
+                    debugger;
+                    $(this).closest(".op-line").find(".operands").html(
+                        zOperands(op.operandOptions),
+                    );
+                });
+
+                $("#main").on("change", ".operand, .operation", function() {
+                    compileFromUI();
+                });
+
+                $("#step").click(function() {
+                    updateAndRender();
+                });
+
+                let runnerHandle = null;
+                $("#play").click( function() {
+                    buttonPlayState(false);
+                    runnerHandle = setInterval(updateAndRender, 1);
+                });
+
+                $("#pause").click( function() {
+                    buttonPlayState(true);
+                    clearInterval(runnerHandle);
+                    runnerHandle = null;
+                });
+
+                $("#clear").click( function() {
+                    buttonPlayState(true);
+                    clearInterval(runnerHandle);
+                    stateInit();
+                    render();
+                });
+
+                renderInit(canvas, uiState.level);
+                buttonPlayState(true);
             }
 
-            setLevelByName("Alternator");
+            createUI(stateGet());
         });
 
 	</script>

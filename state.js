@@ -1,8 +1,13 @@
+function deepCopy(original) {
+    return $.extend(true, {}, original);
+}
+
 let level = null;
 let _requestsByYX = null;
 let stateByYX = null;
 let _stateVarOffsetByVarName = null;
 
+const _compares = [ "<", "<=", "==", ">=", ">" ];
 const _dirNames = ["West", "North", "East", "South"];
 const _dirNameToNumber = {
     "West": 0,
@@ -13,54 +18,77 @@ const _dirNameToNumber = {
 const _dirX = [ -1, 0, 1, 0 ];
 const _dirY = [ 0, -1, 0, 1 ];
 
-// When the operationsVersion is incremented, it invalidates the save state
-const opsVersion = 2;
+const _opsVersion = 3;
+const _ops = [
+    // Each of the following are copied to make a state
+    // For example when you click on ["Replicate", "West"] that will create
+    // a "op" by cloning the "Replicate" block
 
-const opsDefaults = {
-    // Each of the following arrays is called an "opState".
-    // The initial state of each operand is a descriptive default. eg "Direction" as opposed to "East", "West", etc
-    // This table is the "all options" version; the levels cherry pick out of this.
-    "Replicate": [
-        {
-            operand: "Direction",
-            options: _dirNames,
-        },
-    ],
-    "Increment": [
-        {
-            operand: "Variable",
-            _options: "VarNames",
-        },
-    ],
-    "Goto": [
-        {
-            operand: "Line",
-            _options: "LineNames",
-        },
-    ],
-    "If": [
-        {
-            operand: "Left",
-            _options: "VarNames",
-        },
-        {
-            operand: "Cmp",
-            options: [ "<", "<=", "==", ">=", ">" ],
-        },
-        {
-            operand: "Right",
-            _options: "VarNames",
-        },
-        {
-            operand: "Goto",
-            _options: "GotoLineNames",
-        },
-    ],
-    "Stop": [
-    ],
-};
+    {
+        name: "Replicate",
+        letter: "r",
+        operands: [],
+        operandOptions: [
+            {
+                operand: "Direction",
+                options: "_dirNames",
+            },
+        ],
+    },
+    {
+        name: "If",
+        letter: "f",
+        operands: [],
+        operandOptions: [
+            {
+                operand: "Left",
+                options: "_varNames",
+            },
+            {
+                operand: "Cmp",
+                options: "_compares",
+            },
+            {
+                operand: "Right",
+                options: "_varNames",
+            },
+            {
+                operand: "Goto",
+                options: "_lineNames",
+            },
+        ],
+    },
+    {
+        name: "Increment",
+        letter: "i",
+        operands: [],
+        operandOptions: [
+            {
+                operand: "Variable",
+                options: "_varNames",
+            },
+        ],
+    },
+    {
+        name: "Goto",
+        letter: "g",
+        operands: [],
+        operandOptions: [
+            {
+                operand: "Line",
+                options: "_lineNames",
+            },
+        ],
+    },
+    {
+        name: "Stop",
+        letter: "s",
+        operands: [],
+        operandOptions: [],
+    },
+]
 
-const levels = [
+const _levels = [
     // v is the number of variables per cell
     // s is the number of states per variable
     // n is the number of cells on each axis
@@ -72,11 +100,7 @@ const levels = [
         s: 2,
         n: 20,
         l: 4,
-        ops: {
-            "Replicate": opsDefaults["Replicate"],
-            "Increment": opsDefaults["Increment"],
-            "Stop": opsDefaults["Stop"],
-        }
+        allowedOperations: [ "Replicate", "Increment", "Stop" ],
     },
     {
         name: "Filler",
@@ -84,13 +108,70 @@ const levels = [
         s: 2,
         n: 40,
         l: 4,
-        ops: {
-            "Replicate": opsDefaults["Replicate"],
-            "Increment": opsDefaults["Increment"],
-            "Stop": opsDefaults["Stop"],
-        }
+        allowedOperations: [ "Replicate", "Increment", "Stop" ],
     },
 ]
+
+let _saveGame = null;
+
+function _decodeSaveGame(stateStr) {
+}
+
+function _encodeSaveGame(saveGame) {
+    let programOps = [];
+    saveGame.program.map( (opLine) => {
+        let op = _ops.find( op => op.name == opLine.name );
+        let level = _levels.find( i => i.name == saveGame.levelName );
+    });
+}
+
+
+function stateGet() {
+    // Called by the UI to request the information needed to populate the UI
+
+    let encodedSaveGame = window.localStorage.getItem("saveGame");
+    if(encodedSaveGame == null) {
+        _saveGame = {
+            level: "Alternator",
+            program: [],
+        }
+    }
+    else {
+        _saveGame = _decodeSaveGame(encodedSaveGame);
+    }
+
+    let levels = _levels.map( i => i.name );
+
+    let level = _levels.find( i => i.name == _saveGame.level );
+
+    let allowedOperations = level.allowedOperations.map( opName => {
+        let foundOp = _ops.find( i => i.name == opName );
+        return deepCopy(foundOp);
+    });
+
+    // TODO: The  allowedOperations has a named options like "_lineNums"
+    //       but the ui needs this to be expanded to the actual options.
+
+    let program = {
+        allowedOperations: allowedOperations,
+        lines: [],
+    };
+
+    for( let line=0; line<level.l; line++ ) {
+        program.lines.push({
+            operation: "Choose",
+            operands: [],
+        });
+    }
+
+    return {levels, level, program};
+}
+
+function stateUpdateSaveGameFromUI(uiState) {
+    saveGame.program = uiState.program;
+    let encoded = _encodeSaveGame(saveGame);
+    window.localStorage.setItem("saveGame", encoded);
+}
 
 function stateSetLevel(levelName) {
     level = levels.find( i => i.name == levelName );
