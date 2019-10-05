@@ -183,26 +183,57 @@ function stateCompile(opStates) {
     ];
     */
 
-    let lineFuncStrs = opStates.map( (opLine) => {
+    let lines = [];
+    let letters = [];
+
+    opStates.map( (opLine) => {
+        let line = "";
+        let letter = "";
         switch(opLine.operation) {
             case "Replicate":
                 let dirName = opLine.operands[0].operand;
-                return `replicate(${_dirNameToNumber[dirName]}, state); state.line++;`;
+                let dirNumber = _dirNameToNumber[dirName];
+                line = `replicate(${dirNumber}, state); state.line++;`;
+                letter = `r${dirNumber}`;
+                break;
             case "Increment":
                 let varOffset = _stateVarOffsetByVarName[opLine.operands[0].operand];
-                return `state.vars[${varOffset}] = (state.vars[${varOffset}] + 1) % level.s; state.line++;`;
+                line = `state.vars[${varOffset}] = (state.vars[${varOffset}] + 1) % level.s; state.line++;`;
+                letter = `i${varOffset}`;
+                break;
             case "Goto":
                 let gotoLine = opLine.operands[0].operand;
-                return `state.line = ${gotoLine};`;
+                line = `state.line = ${gotoLine};`;
+                letter = `g${gotoLine}`;
+                break;
             case "Stop":
-                return `state.update = false;`;
+                line = `state.update = false;`;
+                letter = "t";
+                break;
             default:
-                return `state.line++;`;
+                line = `state.line++;`;
+                letter = "x";
+                break;
         }
+
+        lines.push(line);
+        letters.push(letter);
     });
 
-    _lineFuncs = lineFuncStrs.map( (i) => Function("state", i) );
+    _lineFuncs = lines.map( (i) => Function("state", i) );
+
+    return `${opsVersion}_${letters.join("_")}`;
 }
+
+
+function opStateFromLetters(letters) {
+    // TODO
+    let codes = letters.split("_");
+    for(let i=0; i<codes.length; i++) {
+        codes[i]
+    }
+}
+
 
 function replicate(dir, srcState) {
     let dstX = srcState.x + _dirX[dir];

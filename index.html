@@ -209,17 +209,25 @@
                     return {operation, operands};
                 }).get();
 
-                window.localStorage.setItem("savedOpsVersion", JSON.stringify(opsVersion));
-                window.localStorage.setItem("savedOpsStates", JSON.stringify(opStates));
+                let code = stateCompile(opStates);
 
-                stateCompile(opStates);
+                var params = new URLSearchParams(window.location.search);
+                params.set("code", code);
+                var newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?' + params.toString();
+                window.history.pushState({path:newUrl},'',newUrl);
+
                 stateInit();
             }
 
             // LOAD saved opStates or invalidate if version does not match
-            let savedOpsVersion = window.localStorage.getItem("savedOpsVersion");
-            let savedOpsStates = window.localStorage.getItem("savedOpsStates");
+
+            var params = new URLSearchParams(window.location.search);
+            let code = params.get("code");
+
+            let codeParts = code.split("_");
+            let savedVersion = parseInt(codeParts[0]);
             if (savedOpsVersion != opsVersion ) {
+                // Version has change so reset to empty.
                 savedOpsStates = new Array(4).fill().map( (_,i) => {
                     return {
                         operation: "Operation",
