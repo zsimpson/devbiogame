@@ -2,9 +2,9 @@ function deepCopy(original) {
     return $.extend(true, {}, original);
 }
 
-let level = null;
-let _requestsByYX = null;
 let stateByYX = null;
+
+let _requestsByYX = null;
 let _stateVarOffsetByVarName = null;
 
 const _compares = [ "<", "<=", "==", ">=", ">" ];
@@ -140,17 +140,42 @@ function stateGet() {
         _saveGame = _decodeSaveGame(encodedSaveGame);
     }
 
-    let levels = _levels.map( i => i.name );
+    let levelNames = _levels.map( i => i.name );
 
     let level = _levels.find( i => i.name == _saveGame.level );
+    debugger;
 
     let allowedOperations = level.allowedOperations.map( opName => {
         let foundOp = _ops.find( i => i.name == opName );
-        return deepCopy(foundOp);
-    });
+        let op = deepCopy(foundOp);
 
-    // TODO: The  allowedOperations has a named options like "_lineNums"
-    //       but the ui needs this to be expanded to the actual options.
+        op.operandOptions.map( operandOption => {
+            let options = [];
+            switch(operandOption.options) {
+                case "_lineNames":
+                    options = new Array(level.l).fill().map( i => `${i+1}` );
+                    break;
+
+                case "_varNames":
+                    options = new Array(level.v).fill().map( (i) => {
+                        String.fromCharCode(65 + i);
+                    });
+                    break;
+
+                case "_compares":
+                    options = _compares;
+                    break;
+
+                case "_dirNames":
+                    options = _dirNames;
+                    break;
+            }
+            operandOption.options = options;
+        })
+
+        debugger;
+        return op;
+    });
 
     let program = {
         allowedOperations: allowedOperations,
@@ -164,7 +189,7 @@ function stateGet() {
         });
     }
 
-    return {levels, level, program};
+    return {levelNames, level, program};
 }
 
 function stateUpdateSaveGameFromUI(uiState) {
@@ -209,7 +234,7 @@ function stateSetLevel(levelName) {
     }
 }
 
-function stateInit() {
+function stateInit(level) {
     stateByYX = [];
 
     for (let y=0; y < level.n; y++) {
@@ -296,7 +321,7 @@ function replicate(dir, srcState) {
     }
 }
 
-function stateUpdate() {
+function stateUpdate(level) {
     _requestsByYX = [];
     for (let y=0; y < level.n; y++) {
         let requestX = [];

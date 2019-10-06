@@ -152,8 +152,26 @@
             }
 
             function createUI(uiState) {
+                function compileFromUI() {
+                    let opStates = $("#program-lines").find(".operation").map( function() {
+                        let operation = $(this).text();
+                        let operands = $(this).closest(".op-line").find(".operand").map( function(i) {
+                            return {
+                                operand: $(this).text(),
+                            }
+                        }).get();
+                        return {operation, operands};
+                    }).get();
+                    let code = stateCompile(opStates);
+                    var params = new URLSearchParams(window.location.search);
+                    params.set("code", code);
+                    var newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?' + params.toString();
+                    window.history.pushState({path:newUrl},'',newUrl);
+                    stateInit(uiState.level);
+                }
+
                 function updateAndRender() {
-                    stateUpdate();
+                    stateUpdate(uiState.level);
                     render(uiState.level);
                 }
 
@@ -184,7 +202,6 @@
                     // Called when any operation changes; REPLACE the operands
                     let operation = $(this).text();
                     let op = uiState.program.allowedOperations.find( allowed => allowed.name == operation );
-                    debugger;
                     $(this).closest(".op-line").find(".operands").html(
                         zOperands(op.operandOptions),
                     );
@@ -213,7 +230,7 @@
                 $("#clear").click( function() {
                     buttonPlayState(true);
                     clearInterval(runnerHandle);
-                    stateInit();
+                    stateInit(uiState.level);
                     render();
                 });
 
