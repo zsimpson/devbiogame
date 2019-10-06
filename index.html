@@ -100,7 +100,7 @@
                     }
                     else {
                         return z("div.btn-group.mr-2",
-                            zDropdownSelect(".operand.btn-info", operand.operand, operand.options)
+                            zDropdownSelect(".operand.btn-info", operand.selection, operand.options)
                         );
                     }
                 });
@@ -231,6 +231,7 @@
                 });
 
                 renderInit(canvas, uiState.level.v, uiState.level.s);
+
                 buttonPlayState(true);
             }
 

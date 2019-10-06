@@ -2,6 +2,23 @@ function deepCopy(original) {
     return $.extend(true, {}, original);
 }
 
+function setURLParam(key, value) {
+    if (history.pushState) {
+        let params = new URLSearchParams(window.location.search);
+        params.set(key, value);
+        let newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?' + params.toString();
+        window.history.pushState({path:newUrl},'',newUrl);
+    }
+}
+
+function getURLParam(key) {
+    if (history.pushState) {
+        let params = new URLSearchParams(window.location.search);
+        return params.get(key);
+    }
+}
+
+
 let stateByYX = null;
 
 let _requestsByYX = null;
@@ -115,7 +132,45 @@ let _currentLevel = null;
 
 let _saveGame = null;
 
-function _decodeSaveGame(stateStr) {
+function operandOptionsByName(level) {
+    return {
+        _lineNames: Array(level.l).fill().map( (_,i) => `${i+1}` ),
+        _varNames: Array(level.v).fill().map( (_,i) => String.fromCharCode(65 + i) ),
+        _compares: _compares,
+        _dirNames: _dirNames,
+    }
+}
+
+function _decodeSaveGame(encoded) {
+    let parts = encoded.split("-");
+    let levelName = parts.shift();
+
+    let level = _levels.find( (level) => level.name == levelName );
+
+    let optionsByName = operandOptionsByName(level);
+
+    let programLines = parts.map( (lineCode) => {
+        let opLetter = lineCode.charAt(0);
+        let operands = lineCode.substring(1).split("_");
+        let _operation = _ops.find( op => op.letter == opLetter );
+        if(_operation) {
+            return {
+                operation: _operation.name,
+                operands: operands.map( (op, opI) => {
+                    let allowedOptions = optionsByName[ _operation.operandOptions[opI].options ];
+                    return {
+                        selection: allowedOptions[ parseInt(op) - 1 ],
+                        options: allowedOptions,
+                    };
+                }),
+            }
+        }
+        else {
+            return {}
+        }
+    })
+
+    return { levelName, program: { lines: programLines } };
 }
 
 function _encodeSaveGame(saveGame) {
@@ -129,17 +184,52 @@ function _encodeSaveGame(saveGame) {
             let lineCodes = programLine.operands.map( (operand, operandI) => {
                 let allowedOptions = _currentLevel.optionsByName[ _operation.operandOptions[operandI].options ];
                 let selectedOption = operand.operand;
-                console.log("allowedOptions", allowedOptions);
                 let foundOffset = allowedOptions.findIndex( op => op == selectedOption );
-                return `${foundOffset}`;
+                // foundOffset can be -1 if found so add one
+                return `${foundOffset + 1}`;
             });
-            return _operation.letter + lineCodes.join(".");
+            return _operation.letter + lineCodes.join("_");
         }
         return "x";
     });
 
-    console.log(lineCodes);
+    return saveGame.levelName + "-" + lineCodes.join("-");
 }
+
+/*
+    Op: {
+        name: String,
+        letter: String,
+        operands: [],
+        operandOptions: [ OperandOption ],
+    }
+
+    OperandOption: {
+        operand: "Variable",
+        options: "_varNames",
+    }
+
+    Program: {
+        lines: [ ProgramLine ],
+        allowedOperations: [ Op ],
+    }
+
+    ProgramLine: {
+        operation: String,
+        operands: [ Operand ]
+    }
+
+    Operand: {
+        label: String (optional)
+        selection: String (optional)
+        options: [ String ]
+    }
+
+    SaveGame: {
+        levelName: String,
+        program: Program
+    }
+*/
 
 function stateGet(levelName) {
     // Called by the UI to request the information needed to populate the UI
@@ -147,11 +237,14 @@ function stateGet(levelName) {
     // otherwise a level request button was pressed.
     if(levelName == "") {
         // Load from save game or create new game
-        let encodedSaveGame = null;//window.localStorage.getItem("saveGame");
+        let encodedSaveGame = getURLParam("_saveGame");
         if(encodedSaveGame == null) {
             _saveGame = {
                 levelName: "Alternator",
-                programLines: [],
+                program: {
+                    allowedOperations: [],
+                    lines: [],
+                }
             }
         }
         else {
@@ -166,12 +259,8 @@ function stateGet(levelName) {
 
     let levelNames = _levels.map( i => i.name );
 
-    let optionsByName = {
-        _lineNames: Array(level.l).fill().map( (_,i) => `${i+1}` ),
-        _varNames: Array(level.v).fill().map( (_,i) => String.fromCharCode(65 + i) ),
-        _compares: _compares,
-        _dirNames: _dirNames,
-    }
+    let optionsByName = operandOptionsByName(level);
+
     _currentLevel.optionsByName = optionsByName;
 
     let allowedOperations = level.allowedOperations.map( opName => {
@@ -179,26 +268,25 @@ function stateGet(levelName) {
         let op = deepCopy(foundOp);
 
         op.operandOptions.map( operandOption => {
-            let options = [];
             operandOption.options = optionsByName[operandOption.options];
         })
 
         return op;
     });
 
-    let program = {
-        allowedOperations: allowedOperations,
-        lines: [],
-    };
+    _saveGame.program.allowedOperations = allowedOperations;
 
-    for( let line=0; line<level.l; line++ ) {
-        program.lines.push({
-            operation: "Choose",
-            operands: [],
-        });
+    // Fill in missing lines
+    for( let i=0; i<level.l; i++ ) {
+        if( ! ("operands" in _saveGame.program.lines[i]) ) {
+            _saveGame.program.lines[i] = {
+                operation: "Choose",
+                operands: [],
+            }
+        }
     }
 
-    return {levelNames, level, program};
+    return { levelNames, level, program:_saveGame.program };
 }
 
 let _lineFuncs = [];
@@ -231,6 +319,7 @@ function stateProgramChanged(programLines) {
     _saveGame.programLines = programLines;
     window.localStorage.setItem("saveGame", JSON.stringify(_saveGame));
     let encoded = _encodeSaveGame(_saveGame);
+    setURLParam("_saveGame", encoded);
 
     let lineFuncStrs = programLines.map( (programLine) => {
         switch(programLine.operation) {
