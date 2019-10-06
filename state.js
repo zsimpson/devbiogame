@@ -153,17 +153,26 @@ function _decodeSaveGame(encoded) {
         let opLetter = lineCode.charAt(0);
         let operands = lineCode.substring(1).split("_");
         let _operation = _ops.find( op => op.letter == opLetter );
-        if(_operation) {
-            return {
+        if( _operation ) {
+            let ret = {
                 operation: _operation.name,
                 operands: operands.map( (op, opI) => {
-                    let allowedOptions = optionsByName[ _operation.operandOptions[opI].options ];
-                    return {
-                        selection: allowedOptions[ parseInt(op) - 1 ],
-                        options: allowedOptions,
-                    };
+                    if( op != "" ) {
+                        let allowedOptions = optionsByName[ _operation.operandOptions[opI].options ];
+                        return {
+                            selection: allowedOptions[ parseInt(op) - 1 ],
+                            options: allowedOptions,
+                        };
+                    }
+                    else {
+                        return {};
+                    }
                 }),
             }
+            if( Object.keys(ret.operands).length == 0 ) {
+                ret.operands = null;
+            }
+            return ret;
         }
         else {
             return {}
@@ -278,7 +287,7 @@ function stateGet(levelName) {
 
     // Fill in missing lines
     for( let i=0; i<level.l; i++ ) {
-        if( ! ("operands" in _saveGame.program.lines[i]) ) {
+        if( ! _saveGame.program.lines[i] || ! ("operands" in _saveGame.program.lines[i]) ) {
             _saveGame.program.lines[i] = {
                 operation: "Choose",
                 operands: [],

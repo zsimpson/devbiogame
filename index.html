@@ -98,7 +98,7 @@
                     if("label" in operand) {
                         return z("span", `${operand.label}:`);
                     }
-                    else {
+                    else if("options" in operand) {
                         return z("div.btn-group.mr-2",
                             zDropdownSelect(".operand.btn-info", operand.selection, operand.options)
                         );
@@ -169,9 +169,12 @@
                     }
                 }
 
-                $("#level-container").html(
+                $("#levels-container").html(
                     zLevels(uiState.levelNames)
                 );
+                debugger;
+                $(`.level-name:contains('${uiState.level.name}')`).addClass("active");
+
 
                 $("#program-container").html(
                     zProgramLines(uiState.program)
@@ -227,12 +230,18 @@
                     buttonPlayState(true);
                     clearInterval(runnerHandle);
                     stateReset();
-                    render();
+                    updateAndRender();
                 });
 
                 renderInit(canvas, uiState.level.v, uiState.level.s);
 
                 buttonPlayState(true);
+
+                programChanged();
+
+                stateReset();
+
+                updateAndRender();
             }
 
             createUI(stateGet(""));
