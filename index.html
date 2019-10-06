@@ -128,32 +128,18 @@
                 );
             }
 
-            function zLevels(levels) {
+            function zLevels(levelNames) {
                 return z("ul.list-group#levels",
-                    levels.map( (level) => {
-                        return z("li.list-group-item.level-name", level.name);
+                    levelNames.map( (levelName) => {
+                        return z("li.list-group-item.level-name", levelName);
                     }),
                 );
             }
 
-            function saveGameFromUI() {
-                let programState = $("#program-container").find(".operation").map( function() {
-                    let operation = $(this).text();
-                    let operands = $(this).closest(".op-line").find(".operand").map( function(i) {
-                        return {
-                            operand: $(this).text(),
-                            options: opsDefaults[operation][i].options,
-                        }
-                    }).get();
-                    return {operation, operands};
-                }).get();
-
-                stateUpdateSaveGameFromUI({programState});
-            }
-
             function createUI(uiState) {
-                function compileFromUI() {
-                    let opStates = $("#program-lines").find(".operation").map( function() {
+                function programChanged() {
+                    // FETCH the program from the UI
+                    let programLines = $("#program-lines").find(".operation").map( function() {
                         let operation = $(this).text();
                         let operands = $(this).closest(".op-line").find(".operand").map( function(i) {
                             return {
@@ -162,17 +148,14 @@
                         }).get();
                         return {operation, operands};
                     }).get();
-                    let code = stateCompile(opStates);
-                    var params = new URLSearchParams(window.location.search);
-                    params.set("code", code);
-                    var newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?' + params.toString();
-                    window.history.pushState({path:newUrl},'',newUrl);
-                    stateInit(uiState.level);
+
+                    stateProgramChanged(programLines);
+                    stateReset();
                 }
 
                 function updateAndRender() {
-                    stateUpdate(uiState.level);
-                    render(uiState.level);
+                    stateUpdate();
+                    render(uiState.level.n, uiState.level.v);
                 }
 
                 function buttonPlayState(play) {
@@ -187,7 +170,7 @@
                 }
 
                 $("#level-container").html(
-                    zLevels(uiState.levels)
+                    zLevels(uiState.levelNames)
                 );
 
                 $("#program-container").html(
@@ -197,6 +180,9 @@
                 let canvas = $("#main-canvas")[0];
                 $(canvas).prop("width", uiState.level.n * d);
                 $(canvas).prop("height", uiState.level.n * d);
+
+                // Program control handlers
+                //-------------------------------------------------
 
                 $("#main").on("change", ".operation", function() {
                     // Called when any operation changes; REPLACE the operands
@@ -208,14 +194,24 @@
                 });
 
                 $("#main").on("change", ".operand, .operation", function() {
-                    compileFromUI();
+                    programChanged();
                 });
+
+                // Level control handlers
+                //-------------------------------------------------
+
+                $("#main").on("click", ".level-name", function() {
+                    createUI(stateGet($(this).text()));
+                });
+
+                // Play control handlers
+                //-------------------------------------------------
+                let runnerHandle = null;
 
                 $("#step").click(function() {
                     updateAndRender();
                 });
 
-                let runnerHandle = null;
                 $("#play").click( function() {
                     buttonPlayState(false);
                     runnerHandle = setInterval(updateAndRender, 1);
@@ -230,15 +226,15 @@
                 $("#clear").click( function() {
                     buttonPlayState(true);
                     clearInterval(runnerHandle);
-                    stateInit(uiState.level);
+                    stateReset();
                     render();
                 });
 
-                renderInit(canvas, uiState.level);
+                renderInit(canvas, uiState.level.v, uiState.level.s);
                 buttonPlayState(true);
             }
 
-            createUI(stateGet());
+            createUI(stateGet(""));
         });
 
 	</script>

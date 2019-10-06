@@ -1,7 +1,7 @@
 // d is the pixel dimension of each cell at 1:1 scaling
 const d = 20;
 
-function _createTris(nativeDim, level) {
+function _createTris(nativeDim, v, s) {
     let halfPi = Math.PI / 2;
     let twoPi = Math.PI * 2;
 
@@ -42,15 +42,15 @@ function _createTris(nativeDim, level) {
     }
 
     let trisByRotAndState = [];
-    for (let rot=0; rot < level.v; rot++) {
+    for (let rot=0; rot < v; rot++) {
         let tris = [];
-        for (let state=0; state < level.s; state ++) {
+        for (let state=0; state < s; state ++) {
             let poly = null
-            if(level.v == 1) {
-                poly = createQuad(360 * state / level.s);
+            if(v == 1) {
+                poly = createQuad(360 * state / s);
             }
             else {
-                poly = createTri(rot * twoPi / level.v, 360 * state / level.s);
+                poly = createTri(rot * twoPi / v, 360 * state / s);
             }
             tris.push(poly);
         }
@@ -65,8 +65,8 @@ let _mainCanvas = null;
 let _lastTime = null;
 let _c = null;
 
-function renderInit(mainCanvas, level) {
-    _trisByRotAndState = _createTris(d, level);
+function renderInit(mainCanvas, v, s) {
+    _trisByRotAndState = _createTris(d, v, s);
 
     _mainCanvas = mainCanvas;
     _c = mainCanvas.getContext("2d");
@@ -80,7 +80,7 @@ function renderInit(mainCanvas, level) {
 }
 
 
-function render(level) {
+function render(n, v) {
     _c.clearRect(0, 0, _mainCanvas.width, _mainCanvas.height);
 
     _c.save();
@@ -88,11 +88,11 @@ function render(level) {
         let r = 0;//4 * Math.random();
 
         // DRAW the cells
-        for (let y=0; y < level.n; y++) {
-            for (let x=0; x < level.n; x++) {
+        for (let y=0; y < n; y++) {
+            for (let x=0; x < n; x++) {
                 let state = stateByYX[y][x];
                 if (state.render) {
-                    for (let i=0; i < level.v; i++) {
+                    for (let i=0; i < v; i++) {
                         _c.drawImage(_trisByRotAndState[i][state.vars[i]], x*d+r, y*d+r);
                     }
                 }
@@ -101,15 +101,15 @@ function render(level) {
 
         // OVERDRAW the grid
         _c.beginPath();
-        for (let y=0; y <= level.n; y++) {
+        for (let y=0; y <= n; y++) {
             _c.moveTo(0, y*d+0.5);
-            _c.lineTo(level.n*d, y*d+0.5);
+            _c.lineTo(n*d, y*d+0.5);
             _c.stroke();
         }
 
-        for (let x=0; x <= level.n; x++) {
+        for (let x=0; x <= n; x++) {
             _c.moveTo(x*d, 0);
-            _c.lineTo(x*d, level.n*d);
+            _c.lineTo(x*d, n*d);
             _c.stroke();
         }
 
