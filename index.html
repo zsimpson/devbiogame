@@ -172,9 +172,8 @@
                 $("#levels-container").html(
                     zLevels(uiState.levelNames)
                 );
-                debugger;
-                $(`.level-name:contains('${uiState.level.name}')`).addClass("active");
 
+                $(`.level-name:contains('${uiState.level.name}')`).addClass("active");
 
                 $("#program-container").html(
                     zProgramLines(uiState.program)

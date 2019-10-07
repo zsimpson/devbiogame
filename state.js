@@ -342,22 +342,13 @@ function stateProgramChanged(programLines) {
                 let gotoLine = programLine.operands[0].operand;
                 return `state.line = ${gotoLine};`;
             case "Stop":
-                line = `state.update = false;`;
-                letter = "t";
-                break;
+                return `state.update = false;`;
             default:
-                line = `state.line++;`;
-                letter = "x";
-                break;
+                return `state.line++;`;
         }
-
-        lines.push(line);
-        letters.push(letter);
     });
 
-    _lineFuncs = lines.map( (i) => Function("state", i) );
-
-    return `${opsVersion}_${letters.join("_")}`;
+    _lineFuncs = lineFuncStrs.map( (i) => Function("state", i) );
 }
 
 
