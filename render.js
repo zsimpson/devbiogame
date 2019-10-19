@@ -80,11 +80,11 @@ function renderInit(mainCanvas, v, s) {
 }
 
 
-function render(n, v) {
+function render(n, v, zoom) {
     _c.clearRect(0, 0, _mainCanvas.width, _mainCanvas.height);
 
     _c.save();
-        _c.scale(1, 1);
+        _c.scale(zoom, zoom);
         let r = 0;//4 * Math.random();
 
         // DRAW the cells

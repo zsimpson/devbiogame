@@ -9,254 +9,38 @@
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.2.1/css/bootstrap.min.css" integrity="sha384-GJzZqFGwb1QTTN6wy59ffF1BuGJpLSa9DkKMp0DgiMDm4iYMj70gZWKYbI706tWS" crossorigin="anonymous">
 	<link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/themes/smoothness/jquery-ui.css">
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.48.4/codemirror.css">
 	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
 	<script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script>
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.3/js/bootstrap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.48.4/codemirror.js"></script>
     <script src="./z.js"></script>
 	<script src="./state.js"></script>
 	<script src="./render.js"></script>
+	<script src="./setup.js"></script>
 	<style type="text/css">
         #main-canvas {
-            width: 100%;
             height: auto;
         }
-        .level-header {
-            margin-top: 200px;
+        #program-container {
+            height: 500px;
+        }
+        .editor {
+            height: 100%;
+        }
+        textarea.form-control {
+            height: 100%;
+            font-family: monospace;
         }
     </style>
 	<script>
         $(document).ready(function() {
-
-            function zDropdownSelect(btnClass, title, options) {
-                // Make a dropdown select menu with title and options
-                // When clicked, the title will become the selected option.
-                return z("div.dropdown-select",
-                    z(`a.btn.dropdown-toggle${btnClass}`,
-                        {
-                            data: { toggle: "dropdown" },
-                            href: "#",
-                        },
-                        title
-                    ),
-                    z("ul.dropdown-menu",
-                        options.map( (option) => {
-                            return z("li.dropdown-item", z("a", { href: "#" }, `${option}`) );
-                        }),
-                    ),
-                );
-            }
-
-            let zCanvas = z("canvas#main-canvas");
-
-            let zMain = z("div.p-3",
-                z("div.row",
-                    z("div.col-4",
-                        z("div#program-container"),
-
-                        z("h2.level-header", "Levels"),
-                        z("div#levels-container"),
-
-                    ),
-                    z("div.col",
-                        z("div.btn-toolbar.mb-2",
-                            z("button.btn.btn-success.mr-2#step", {type:"button"},
-                                z("span.fa.fa-step-forward.mr-2", {"aria-hidden":"true"}),
-                                "Step"
-                            ),
-                            z("button.btn.btn-success.mr-2#play", {type:"button"},
-                                z("span.fa.fa-play.mr-2", {"aria-hidden":"true"}),
-                                "Play"
-                            ),
-                            z("button.btn.btn-success.mr-2#pause", {type:"button"},
-                                z("span.fa.fa-pause.mr-2", {"aria-hidden":"true"}),
-                                "Pause"
-                            ),
-                            z("button.btn.btn-success.mr-2#clear", {type:"button"},
-                                z("span.fa.fa-stop.mr-2", {"aria-hidden":"true"}),
-                                "Clear"
-                            ),
-                        ),
-                        z("div", zCanvas),
-                    ),
-                ),
-            );
-
-            $("#main").html(zMain);
-
-            $("#main").on("click", ".dropdown-menu li", function() {
-                // Called when any dropdown is click; SET the text and trigger a change
-                // This is generic to all dropdowns. The .change() callbacks on
-                // specific dropdown classes is what implements the business logic
-                // for each kind of dropdown.
-                let selText = $(this).find("a").text();
-                $(this).closest(".dropdown-select").find(".dropdown-toggle").text(selText).change();
-            });
-
-            function zOperands(operands) {
-                return operands.map( (operand) => {
-                    if("label" in operand) {
-                        return z("span", `${operand.label}:`);
-                    }
-                    else if("options" in operand) {
-                        return z("div.btn-group.mr-2",
-                            zDropdownSelect(".operand.btn-info", operand.selection, operand.options)
-                        );
-                    }
-                });
-            }
-
-            function zProgramLines(program) {
-                return z("ul.list-group#program-lines",
-                    program.lines.map( (line, i) => {
-                        return z("li.list-group-item.d-flex.align-items-center",
-                            z("span.badge.badge-secondary.badge-pill.mr-4", `${i + 1}`),
-                            z("div.btn-toolbar.op-line",
-                                z("div.btn-group.mr-2",
-                                   zDropdownSelect(
-                                        ".operation.btn-primary",
-                                        line.operation,
-                                        program.allowedOperations.map( op => op.name )
-                                   ),
-                                ),
-                                z("div.operands",
-                                    zOperands(line.operands)
-                                ),
-                            ),
-                        );
-                    }),
-                );
-            }
-
-            function zLevels(levelNames) {
-                return z("ul.list-group#levels",
-                    levelNames.map( (levelName) => {
-                        return z("li.list-group-item.level-name", levelName);
-                    }),
-                );
-            }
-
-            function createUI(uiState) {
-                function programChanged() {
-                    // FETCH the program from the UI
-                    let programLines = $("#program-lines").find(".operation").map( function() {
-                        let operation = $(this).text();
-                        let operands = $(this).closest(".op-line").find(".operand").map( function(i) {
-                            return {
-                                operand: $(this).text(),
-                            }
-                        }).get();
-                        return {operation, operands};
-                    }).get();
-
-                    stateProgramChanged(programLines);
-                    stateReset();
-                }
-
-                function updateAndRender() {
-                    stateUpdate();
-                    render(uiState.level.n, uiState.level.v);
-                }
-
-                function buttonPlayState(play) {
-                    if(play) {
-                        $("#pause").addClass("d-none");
-                        $("#play").removeClass("d-none");
-                    }
-                    else {
-                        $("#pause").removeClass("d-none");
-                        $("#play").addClass("d-none");
-                    }
-                }
-
-                $("#levels-container").html(
-                    zLevels(uiState.levelNames)
-                );
-
-                $(`.level-name:contains('${uiState.level.name}')`).addClass("active");
-
-                $("#program-container").html(
-                    zProgramLines(uiState.program)
-                );
-
-                let canvas = $("#main-canvas")[0];
-                $(canvas).prop("width", uiState.level.n * d);
-                $(canvas).prop("height", uiState.level.n * d);
-
-                // Program control handlers
-                //-------------------------------------------------
-
-                $("#main").on("change", ".operation", function() {
-                    // Called when any operation changes; REPLACE the operands
-                    let operation = $(this).text();
-                    let op = uiState.program.allowedOperations.find( allowed => allowed.name == operation );
-                    $(this).closest(".op-line").find(".operands").html(
-                        zOperands(op.operandOptions),
-                    );
-                });
-
-                $("#main").on("change", ".operand, .operation", function() {
-                    programChanged();
-                });
-
-                // Level control handlers
-                //-------------------------------------------------
-
-                $("#main").on("click", ".level-name", function() {
-                    createUI(stateGet($(this).text()));
-                });
-
-                // Play control handlers
-                //-------------------------------------------------
-                let runnerHandle = null;
-
-                $("#step").click(function() {
-                    updateAndRender();
-                });
-
-                $("#play").click( function() {
-                    buttonPlayState(false);
-                    runnerHandle = setInterval(updateAndRender, 1);
-                });
-
-                $("#pause").click( function() {
-                    buttonPlayState(true);
-                    clearInterval(runnerHandle);
-                    runnerHandle = null;
-                });
-
-                $("#clear").click( function() {
-                    buttonPlayState(true);
-                    clearInterval(runnerHandle);
-                    stateReset();
-                    updateAndRender();
-                });
-
-                renderInit(canvas, uiState.level.v, uiState.level.s);
-
-                buttonPlayState(true);
-
-                programChanged();
-
-                stateReset();
-
-                updateAndRender();
-            }
-
-            createUI(stateGet(""));
+            createUI();
         });
-
 	</script>
 </head>
 <body>
     <div id="main"></div>
-    <div>
-        <h2>To Do</h2>
-        <ol>
-            <li>Concept of a level (n, may change, some things allowed others not, num lines)</li>
-            <li>Code line delete, add, etc.</li>
-            <li>Figure out z-ordering problems of dropdowns</li>
-        </ol>
-    </div>
 </body>
 </html>
