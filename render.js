@@ -73,7 +73,6 @@ function renderInit(mainCanvas, v, s, n) {
     let w = $(mainCanvas).width();
     let h = $(mainCanvas).height();
     _d = Math.floor(Math.min(w, h) / n);
-    console.log(_d);
 
     _trisByAliveAndRotAndState = _createTris(_d, v, s);
 
