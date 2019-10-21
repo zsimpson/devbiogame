@@ -65,8 +65,8 @@ function stateGet() {
 }
 
 let cellState = {
-    render: false,
-    update: false,
+    render: 0,
+    alive: 0,
     _x: 0,
     _y: 0,
     age: 0,
@@ -90,8 +90,12 @@ let cellState = {
         this.vars[which_v] = val;
     },
     stop: function() {
-        this.update = false;
-    }
+        this.alive = 0;
+    },
+    pop: function() {
+        this.alive = 0;
+        this.render = 0;
+    },
 };
 
 
@@ -114,8 +118,8 @@ function stateReset() {
     }
 
     let centerState = stateByYX[n / 2][n / 2];
-    centerState.update = true;
-    centerState.render = true;
+    centerState.alive = 1;
+    centerState.render = 1;
     return _currentGame;
 }
 
@@ -134,7 +138,7 @@ function stateUpdate() {
     for (let y=0; y < n; y++) {
         for (let x=0; x < n; x++) {
             let state = stateByYX[y][x];
-            if (state.update) {
+            if (state.alive != 0) {
                 (_currentGame.funcs || []).map( i => i(state) );
                 state.age ++;
             }
@@ -153,8 +157,8 @@ function stateUpdate() {
                     state.vars[i] = request.vars[i];
                 }
                 state.age = 0;
-                state.render = true;
-                state.update = true;
+                state.render = 1;
+                state.alive = 1;
             }
         }
     }
