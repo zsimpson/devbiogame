@@ -74,6 +74,9 @@ let cellState = {
     inc: function(which_v) {
         this.vars[which_v] = (this.vars[which_v] + 1) % _currentGame.level.s;
     },
+    dec: function(which_v) {
+        this.vars[which_v] = (this.vars[which_v] + _currentGame.level.s - 1) % _currentGame.level.s;
+    },
     replicate: function(dir) {
         dir = dir % 4;
         let dstX = this._x + _dirX[dir];

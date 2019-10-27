@@ -1,7 +1,7 @@
 function createUI() {
     let zBody = z("div.container-fluid.h-100",
         z("div.row.h-100",
-            z("div#program-container.h-100.col-3.max-w-300.p-0",
+            z("div#program-container.h-100.col-3.p-0",
                 z("textarea#editor.form-control")
             ),
             z("div#game-container.col.h-100",
