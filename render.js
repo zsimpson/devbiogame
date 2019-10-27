@@ -1,4 +1,4 @@
-function _createTris(nativeDim, v, s) {
+function _createTris(nativeDim, nVars, nStates) {
     let halfPi = Math.PI / 2;
     let twoPi = Math.PI * 2;
 
@@ -44,15 +44,15 @@ function _createTris(nativeDim, v, s) {
     let alives = [];
     for (let alive=0; alive < 2; alive++) {
         let trisByRotAndState = [];
-        for (let rot=0; rot < v; rot++) {
+        for (let rot=0; rot < nVars; rot++) {
             let tris = [];
-            for (let state=0; state < s; state ++) {
+            for (let state=0; state < nStates; state ++) {
                 let poly = null
-                if(v == 1) {
-                    poly = createQuad(360 * state / s, alive);
+                if(nVars == 1) {
+                    poly = createQuad(360 * state / nStates, alive);
                 }
                 else {
-                    poly = createTri(rot * twoPi / v, 360 * state / s, alive);
+                    poly = createTri(rot * twoPi / nVars, 360 * state / nStates, alive);
                 }
                 tris.push(poly);
             }
@@ -66,15 +66,46 @@ function _createTris(nativeDim, v, s) {
 let _trisByAliveAndRotAndState = null;
 let _mainCanvas = null;
 let _lastTime = null;
-let _c = null;
-let _d = null;
+let _c = null; // canvas context
 
-function renderInit(mainCanvas, v, s, n) {
-    let w = $(mainCanvas).width();
-    let h = $(mainCanvas).height();
-    _d = Math.floor(Math.min(w, h) / n);
+let _nPixelsPerCellAtZoom1 = 20;
+let _nPixelsPerCell = _nPixelsPerCellAtZoom1;
 
-    _trisByAliveAndRotAndState = _createTris(_d, v, s);
+function renderGetFullZoom(mainCanvas, nCells) {
+    let wrapperParent = $(mainCanvas).parent().parent();
+    let w = $(wrapperParent).width();
+    let h = $(wrapperParent).height();
+    let windowDim = Math.min(w, h);
+    return windowDim / (nCells * _nPixelsPerCellAtZoom1);
+}
+
+function renderInit(mainCanvas, nVars, nStates, nCells, zoom) {
+    _nPixelsPerCell = Math.floor(_nPixelsPerCellAtZoom1 * zoom);
+
+    // wrapper-parent
+    //   wrapper
+    //     canvas
+
+    // The wrapper-parent is automatically sized so that is square and fits in
+    // the full size of the window. With that I can find out what its true dims are.
+    let wrapperParent = $(mainCanvas).parent().parent();
+    let w = $(wrapperParent).width();
+    let h = $(wrapperParent).height();
+    let forceWrapperDim = Math.min(w, h);
+    let wrapper = $(mainCanvas).parent();
+    $(wrapper).width(forceWrapperDim).height(forceWrapperDim);
+
+    // The canvas dimension is set by the size of the game map.
+    // Note that the $(canvas).width() is DIFFERENT than the canvas.width.
+    //   $(canvas).width() is the size of the DOM object
+    //   $(canvas).width is the number of pixels in the canvas.
+    // I set both to the same thing to maintain 1:1 pixel ratios.
+    let canvasDim = nCells * _nPixelsPerCell;
+    $(mainCanvas).width(canvasDim).height(canvasDim);
+    mainCanvas.width = canvasDim;
+    mainCanvas.height = canvasDim;
+
+    _trisByAliveAndRotAndState = _createTris(_nPixelsPerCell, nVars, nStates);
 
     _mainCanvas = mainCanvas;
     _c = mainCanvas.getContext("2d");
@@ -87,44 +118,46 @@ function renderInit(mainCanvas, v, s, n) {
     _lastTime = performance.now();
 }
 
-
-function render(n, v, zoom) {
+function render(nCells, nVars) {
     _c.clearRect(0, 0, _mainCanvas.width, _mainCanvas.height);
 
-    _c.save();
-        _c.scale(zoom, zoom);
-
-        // DRAW the cells
-        for (let y=0; y < n; y++) {
-            for (let x=0; x < n; x++) {
-                let state = stateByYX[y][x];
-                if (state.render != 0) {
-                    for (let i=0; i < v; i++) {
-                        _c.drawImage(_trisByAliveAndRotAndState[state.alive][i][state.vars[i]], x * _d, y * _d);
-                    }
+    // DRAW the cells
+    for (let y=0; y < nCells; y++) {
+        for (let x=0; x < nCells; x++) {
+            let state = stateByYX[y][x];
+            if (state.render != 0) {
+                for (let i=0; i < nVars; i++) {
+                    _c.drawImage(
+                        _trisByAliveAndRotAndState[state.alive][i][state.vars[i]],
+                        x * _nPixelsPerCell,
+                        y * _nPixelsPerCell
+                    );
                 }
             }
         }
+    }
 
-        // OVERDRAW the grid
-        _c.beginPath();
-        for (let y=0; y <= n; y++) {
-            _c.moveTo(0, y * _d);
-            _c.lineTo(n * _d, y * _d);
-            _c.stroke();
-        }
+    /*
+    // OVERDRAW the grid
+    _c.beginPath();
+    for (let y=0; y <= nCells; y++) {
+        _c.moveTo(0, y * _nPixelsPerCell);
+        _c.lineTo(nCells * _nPixelsPerCell, y * _nPixelsPerCell);
+        _c.stroke();
+    }
 
-        for (let x=0; x <= n; x++) {
-            _c.moveTo(x * _d, 0);
-            _c.lineTo(x * _d, n * _d);
-            _c.stroke();
-        }
+    for (let x=0; x <= nCells; x++) {
+        _c.moveTo(x * _nPixelsPerCell, 0);
+        _c.lineTo(x * _nPixelsPerCell, nCells * _nPixelsPerCell);
+        _c.stroke();
+    }
 
-        // DRAW FPS
-        let now = performance.now();
-        let fps = 1000.0 / (now - _lastTime);
-        lastTime = now;
-        // _c.fillText(`${fps.toFixed(0)} fps`, 10, 26);
-    _c.restore();
+    // DRAW FPS
+    let now = performance.now();
+    let fps = 1000.0 / (now - _lastTime);
+    lastTime = now;
+    // _c.fillText(`${fps.toFixed(0)} fps`, 10, 26);
+    */
+
 }
 

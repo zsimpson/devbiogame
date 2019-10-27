@@ -32,9 +32,9 @@ function updateCurrentGameByRunningProgram() {
     _currentGame.runFunction = Function(_currentGame.program || "");
     let retBlock = _currentGame.runFunction();
     _currentGame.level = {
-        v: 1,
-        s: 4,
-        n: 40,
+        v: 1,  // n variables
+        s: 4,  // n states per variables
+        n: 40, // n cells (on a side)
     }
     try {
         if( retBlock.version >= _version ) {
